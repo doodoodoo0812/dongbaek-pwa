@@ -262,16 +262,13 @@
 
       <!-- 납부 현황 -->
       <section id="panel-status" class="panel">
-        <div class="panel-header">
-          <h2>납부 현황</h2>
-        </div>
 
+        <!-- 월 선택 -->
         <div class="month-selector">
           <button class="month-nav" onclick="changeMonth(-1)">◀</button>
           <span class="month-display" id="status-month-display" onclick="toggleMonthPicker()" style="cursor:pointer;user-select:none" title="클릭해서 월 선택"></span>
           <button class="month-nav" onclick="changeMonth(1)">▶</button>
         </div>
-        <!-- 월 선택 달력 -->
         <div id="month-picker" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <button class="month-nav" onclick="changePickerYear(-1)">◀</button>
@@ -281,38 +278,35 @@
           <div id="picker-months" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px"></div>
         </div>
 
+        <!-- 요약 통계 -->
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">전체</div>
             <div class="stat-value" id="s-total">0</div>
           </div>
           <div class="stat-card stat-paid">
-            <div class="stat-label">납부</div>
+            <div class="stat-label">✅ 납부</div>
             <div class="stat-value" id="s-paid">0</div>
           </div>
           <div class="stat-card stat-unpaid">
-            <div class="stat-label">미납</div>
+            <div class="stat-label">❌ 미납</div>
             <div class="stat-value" id="s-unpaid">0</div>
           </div>
           <div class="stat-card stat-unknown">
-            <div class="stat-label">확인필요</div>
+            <div class="stat-label">⚠️ 확인필요</div>
             <div class="stat-value" id="s-unknown">0</div>
           </div>
         </div>
 
+        <!-- 액션 버튼 -->
         <div class="action-bar">
-          <button class="btn btn-primary" onclick="runAutoMatch()">🔗 자동 매칭 실행</button>
-          <button class="btn btn-ghost" onclick="exportMonthlyExcel()">📊 엑셀 내보내기</button>
+          <button class="btn btn-primary" onclick="runAutoMatch()">🔗 자동 매칭</button>
+          <button class="btn btn-ghost" onclick="exportMonthlyExcel()">📊 엑셀 저장</button>
         </div>
 
-        <div class="filter-bar">
-          <button class="filter-btn active" onclick="setFilter('all', this)">전체</button>
-          <button class="filter-btn" onclick="setFilter('paid', this)">납부</button>
-          <button class="filter-btn" onclick="setFilter('unpaid', this)">미납</button>
-          <button class="filter-btn" onclick="setFilter('unknown', this)">확인필요</button>
-        </div>
+        <!-- 선생님별 현황 리스트 -->
+        <div id="status-list"></div>
 
-        <div id="status-list" class="list-container"></div>
       </section>
 
     </main>

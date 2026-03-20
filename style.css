@@ -445,6 +445,56 @@ html, body {
 }
 .toast.show { opacity: 1; }
 
+/* ===== 납부 현황 - 선생님별 그룹 테이블 ===== */
+.status-teacher-group { margin-bottom: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.status-teacher-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--surface2); cursor: pointer;
+  user-select: none;
+}
+.status-teacher-header:hover { background: var(--border); }
+.status-teacher-name { font-size: 14px; font-weight: 700; }
+.status-teacher-summary { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+.status-teacher-body { display: none; }
+.status-teacher-group.open .status-teacher-body { display: block; }
+.status-teacher-group.open .status-teacher-arrow { transform: rotate(180deg); }
+.status-teacher-arrow { font-size: 11px; color: var(--text3); transition: transform 0.2s; }
+
+.status-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 90px 80px;
+  align-items: center;
+  padding: 8px 14px;
+  border-top: 0.5px solid var(--border);
+  font-size: 13px;
+  gap: 8px;
+}
+.status-row:hover { background: var(--surface2); }
+.status-row-name { font-weight: 500; }
+.status-row-mask { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--primary); }
+.status-row-amount { font-size: 12px; color: var(--text2); text-align: right; }
+.status-row-badge { text-align: center; }
+
+.s-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 12px; font-size: 11px; font-weight: 700;
+  white-space: nowrap;
+}
+.s-badge.paid { background: var(--paid-bg); color: var(--paid); }
+.s-badge.unpaid { background: var(--unpaid-bg); color: var(--unpaid); }
+.s-badge.unknown { background: var(--unknown-bg); color: var(--unknown); cursor: pointer; }
+
+.status-col-header {
+  display: grid;
+  grid-template-columns: 1fr 80px 90px 80px;
+  padding: 6px 14px;
+  font-size: 11px; font-weight: 700;
+  color: var(--text3); background: var(--surface);
+  border-top: 0.5px solid var(--border);
+  gap: 8px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
 /* ===== 선생님별 그룹 ===== */
 .teacher-group { margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .teacher-group-header {

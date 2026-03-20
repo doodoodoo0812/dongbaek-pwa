@@ -199,7 +199,7 @@ function renderTeacherGroups() {
       const students = groups[teacher];
       const safeId = 'tg-' + teacher.replace(/[\s()]/g, '-');
       return `
-        <div class="teacher-group" id="${safeId}">
+        <div class="teacher-group open" id="${safeId}">
           <div class="teacher-group-header" onclick="toggleTeacherGroup('${safeId}')">
             <div class="teacher-group-title">
               <span>👨‍🏫</span><span>${teacher}</span>
@@ -631,8 +631,6 @@ function selectPickerMonth(ym) {
 
 function setFilter(f, btn) {
   statusFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
   renderStatus();
 }
 
@@ -640,16 +638,12 @@ function renderStatus() {
   if (currentTab !== 'status') return;
   const list = document.getElementById('status-list');
 
-  // 회원이 없으면 임시 예시 표시
-  if (db.members.length === 0) {
-    renderSampleStatus();
-    return;
-  }
+  if (db.members.length === 0) { renderSampleStatus(); return; }
 
   const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(statusMonth));
-
   let paid = 0, unpaid = 0, unknown = 0;
 
+  // 회원별 상태 계산
   const items = db.members.map(m => {
     const mPayments = monthPayments.filter(p => p.memberId === m.id);
     const candidatePayments = monthPayments.filter(p => !p.memberId && getCandidates(p.payer).some(c => c.id === m.id));
@@ -665,65 +659,109 @@ function renderStatus() {
   document.getElementById('s-unpaid').textContent = unpaid;
   document.getElementById('s-unknown').textContent = unknown;
 
+  // 필터 적용
   const filtered = statusFilter === 'all' ? items : items.filter(i => i.status === statusFilter);
-
   if (!filtered.length) {
-    list.innerHTML = `<div class="list-empty">${db.members.length === 0 ? '회원을 먼저 등록하세요' : '해당 항목이 없어요'}</div>`;
+    list.innerHTML = `<div class="list-empty">해당 항목이 없어요</div>`;
     return;
   }
 
-  const order = { unpaid: 0, unknown: 1, paid: 2 };
-  filtered.sort((a, b) => order[a.status] - order[b.status]);
+  // 선생님별 그룹핑
+  const groups = {};
+  filtered.forEach(item => {
+    const t = item.member.teacher || '(담당 미지정)';
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(item);
+  });
 
-  list.innerHTML = filtered.map(({ member: m, status, mPayments, candidatePayments }) => {
-    const lastPayment = mPayments[mPayments.length - 1];
-    const badgeClass = { paid: 'badge-paid', unpaid: 'badge-unpaid', unknown: 'badge-unknown' }[status];
-    const badgeText = { paid: '납부 ✓', unpaid: '미납', unknown: '확인필요' }[status];
+  const teacherNames = Object.keys(groups).sort((a, b) => {
+    const ai = TEACHER_ORDER.indexOf(a), bi = TEACHER_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
 
-    // 금액 불일치 경고
-    let amountWarning = '';
-    if (status === 'paid' && lastPayment && m.fee && lastPayment.amount && m.fee !== lastPayment.amount) {
-      amountWarning = `<div style="font-size:11px;color:var(--unknown);margin-top:4px">⚠️ 등록 납부액(${m.fee.toLocaleString()}원)과 실제 결제(${lastPayment.amount.toLocaleString()}원)가 달라요</div>`;
-    }
+  list.innerHTML = teacherNames.map(teacher => {
+    const groupItems = groups[teacher];
+    // 미납→확인필요→납부 순
+    groupItems.sort((a, b) => ({ unpaid: 0, unknown: 1, paid: 2 }[a.status] - { unpaid: 0, unknown: 1, paid: 2 }[b.status]));
 
-    let detailHtml = '';
-    if (status === 'paid' && lastPayment) {
-      detailHtml = `<div class="status-detail">${lastPayment.datetime || ''} · ${lastPayment.amount ? lastPayment.amount.toLocaleString() + '원' : ''}</div>${amountWarning}`;
-    }
-    if (status === 'unknown') {
-      const tags = candidatePayments.map(p => `
-        <span class="candidate-tag" onclick="confirmAssign(${p.id}, ${m.id})" title="클릭하면 이 회원으로 매칭">
-          ${p.payer} ${p.amount ? p.amount.toLocaleString() + '원' : ''} ${p.time || ''}
-        </span>`).join('');
-      detailHtml = `<div class="status-detail" style="margin-bottom:6px">👇 클릭해서 매칭 확인</div><div class="status-candidates">${tags}</div>`;
-    }
+    const gPaid = groupItems.filter(i => i.status === 'paid').length;
+    const gUnpaid = groupItems.filter(i => i.status === 'unpaid').length;
+    const gUnknown = groupItems.filter(i => i.status === 'unknown').length;
+    const safeId = 'sg-' + teacher.replace(/[\s()]/g, '-');
 
-    // 이중납부 경고
-    let dupWarning = '';
-    if (mPayments.length > 1) {
-      dupWarning = `<div style="font-size:11px;color:var(--unpaid);margin-top:4px">⚠️ 이달 납부 내역이 ${mPayments.length}건이에요 (중복 확인 필요)</div>`;
-    }
+    const rows = groupItems.map(({ member: m, status, mPayments, candidatePayments }) => {
+      const lastPay = mPayments[mPayments.length - 1];
+      const amountText = status === 'paid' && lastPay
+        ? lastPay.amount ? lastPay.amount.toLocaleString() + '원' : '-'
+        : m.fee ? m.fee.toLocaleString() + '원' : '-';
+
+      const dupWarn = mPayments.length > 1
+        ? `<span style="color:var(--unpaid);font-size:10px;margin-left:4px">중복${mPayments.length}건</span>` : '';
+      const amtWarn = status === 'paid' && lastPay && m.fee && lastPay.amount && m.fee !== lastPay.amount
+        ? `<span style="color:var(--unknown);font-size:10px;margin-left:4px">금액불일치</span>` : '';
+
+      // 확인필요: 후보 클릭
+      let badgeHtml = '';
+      if (status === 'paid') {
+        badgeHtml = `<div class="status-row-badge">
+          <span class="s-badge paid">✅ 납부</span>
+          ${dupWarn}${amtWarn}
+        </div>`;
+      } else if (status === 'unpaid') {
+        badgeHtml = `<div class="status-row-badge"><span class="s-badge unpaid">❌ 미납</span></div>`;
+      } else {
+        const candTags = candidatePayments.map(p =>
+          `<span class="s-badge unknown" onclick="confirmAssign(${p.id},${m.id})" title="${p.datetime}">
+            ⚠️ ${p.payer} ${p.amount ? p.amount.toLocaleString()+'원' : ''} 클릭매칭
+          </span>`
+        ).join(' ');
+        badgeHtml = `<div class="status-row-badge" style="text-align:left">${candTags}</div>`;
+      }
+
+      const cancelBtn = status === 'paid' && mPayments.length > 0
+        ? `<button class="btn btn-ghost btn-sm" style="height:24px;padding:0 8px;font-size:10px;margin-top:2px" onclick="unassignPayment(${mPayments[0].id})">취소</button>` : '';
+
+      return `
+        <div class="status-row" style="${status === 'paid' ? '' : status === 'unpaid' ? 'opacity:0.75' : ''}">
+          <div>
+            <div class="status-row-name">${m.name} ${cancelBtn}</div>
+            <div class="status-row-mask">${m.mask || ''} ${m.memo ? `<span style="color:var(--text3);font-family:'Noto Sans KR',sans-serif">${m.memo}</span>` : ''}</div>
+          </div>
+          <div class="status-row-amount">${amountText}</div>
+          <div style="font-size:11px;color:var(--text3);text-align:center">${status === 'paid' && lastPay ? (lastPay.date || '') : ''}</div>
+          ${badgeHtml}
+        </div>`;
+    }).join('');
 
     return `
-      <div class="status-item ${status}">
-        <div class="status-top">
-          <div>
-            <span class="status-name">${m.name}</span>
-            ${m.mask ? `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--primary);margin-left:8px">${m.mask}</span>` : ''}
+      <div class="status-teacher-group open" id="${safeId}">
+        <div class="status-teacher-header" onclick="toggleStatusGroup('${safeId}')">
+          <div class="status-teacher-name">👨‍🏫 ${teacher}</div>
+          <div class="status-teacher-summary">
+            ${gPaid > 0 ? `<span style="background:var(--paid-bg);color:var(--paid);padding:2px 7px;border-radius:10px;font-weight:700">✅${gPaid}</span>` : ''}
+            ${gUnpaid > 0 ? `<span style="background:var(--unpaid-bg);color:var(--unpaid);padding:2px 7px;border-radius:10px;font-weight:700">❌${gUnpaid}</span>` : ''}
+            ${gUnknown > 0 ? `<span style="background:var(--unknown-bg);color:var(--unknown);padding:2px 7px;border-radius:10px;font-weight:700">⚠️${gUnknown}</span>` : ''}
+            <span class="status-teacher-arrow">▼</span>
           </div>
-          <span class="status-badge ${badgeClass}">${badgeText}</span>
         </div>
-        ${m.teacher ? `<div style="font-size:12px;color:var(--text2);margin-bottom:4px">👨‍🏫 ${m.teacher}</div>` : ''}
-        ${detailHtml}
-        ${dupWarning}
-        ${m.memo ? `<div style="font-size:11px;color:var(--text3);margin-top:4px">${m.memo}</div>` : ''}
-        ${status === 'paid' && mPayments.length > 0 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="unassignPayment(${mPayments[0].id})">매칭 취소</button>` : ''}
-      </div>
-    `;
+        <div class="status-teacher-body">
+          <div class="status-col-header">
+            <span>이름</span><span style="text-align:right">금액</span><span style="text-align:center">날짜</span><span style="text-align:center">상태</span>
+          </div>
+          ${rows}
+        </div>
+      </div>`;
   }).join('');
 }
 
-// ===== 현황 임시 예시 =====
+function toggleStatusGroup(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ===== 현황 샘플 =====
 function renderSampleStatus() {
   const list = document.getElementById('status-list');
   document.getElementById('s-total').textContent = '10';
@@ -732,46 +770,74 @@ function renderSampleStatus() {
   document.getElementById('s-unknown').textContent = '2';
 
   const samples = [
-    { name: '김민준', mask: '김*준', teacher: '지사장님', memo: '초등4학년', status: 'unpaid', datetime: '', amount: 0 },
-    { name: '이서연', mask: '이*연', teacher: '지사장님', memo: '중등1학년', status: 'unknown', datetime: '2025-03-05 14:22', amount: 200000 },
-    { name: '최지우', mask: '최*우', teacher: '최수정',  memo: '초등6학년', status: 'paid',    datetime: '2025-03-03 10:15', amount: 180000 },
-    { name: '정예린', mask: '정*린', teacher: '최수정',  memo: '고등1학년', status: 'paid',    datetime: '2025-03-07 16:40', amount: 200000 },
-    { name: '한도윤', mask: '한*윤', teacher: '김가영',  memo: '중등3학년', status: 'paid',    datetime: '2025-03-02 09:30', amount: 180000 },
-    { name: '오승현', mask: '오*현', teacher: '이묘련',  memo: '고등2학년', status: 'unpaid',  datetime: '', amount: 0 },
-    { name: '윤하은', mask: '윤*은', teacher: '김선미',  memo: '초등5학년', status: 'paid',    datetime: '2025-03-10 11:05', amount: 180000 },
-    { name: '임준호', mask: '임*호', teacher: '이현주',  memo: '초등3학년', status: 'unknown', datetime: '2025-03-08 15:33', amount: 180000 },
-    { name: '강수아', mask: '강*아', teacher: '김보온',  memo: '중등2학년', status: 'paid',    datetime: '2025-03-04 13:20', amount: 200000 },
-    { name: '박재현', mask: '박*현', teacher: '김보온',  memo: '고등3학년', status: 'paid',    datetime: '2025-03-06 17:55', amount: 180000 },
+    { name: '김민준', mask: '김*준', teacher: '지사장님', memo: '초등4학년', status: 'paid',    date: '03-03', amount: 180000 },
+    { name: '이서연', mask: '이*연', teacher: '지사장님', memo: '중등1학년', status: 'unknown', date: '',      amount: 200000 },
+    { name: '최지우', mask: '최*우', teacher: '최수정',  memo: '초등6학년', status: 'paid',    date: '03-05', amount: 180000 },
+    { name: '정예린', mask: '정*린', teacher: '최수정',  memo: '고등1학년', status: 'unpaid',  date: '',      amount: 0 },
+    { name: '한도윤', mask: '한*윤', teacher: '김가영',  memo: '중등3학년', status: 'paid',    date: '03-02', amount: 180000 },
+    { name: '오승현', mask: '오*현', teacher: '이묘련',  memo: '고등2학년', status: 'unpaid',  date: '',      amount: 0 },
+    { name: '윤하은', mask: '윤*은', teacher: '김선미',  memo: '초등5학년', status: 'paid',    date: '03-10', amount: 180000 },
+    { name: '임준호', mask: '임*호', teacher: '이현주',  memo: '초등3학년', status: 'unknown', date: '',      amount: 180000 },
+    { name: '강수아', mask: '강*아', teacher: '김보온',  memo: '중등2학년', status: 'paid',    date: '03-04', amount: 200000 },
+    { name: '박재현', mask: '박*현', teacher: '김보온',  memo: '고등3학년', status: 'paid',    date: '03-06', amount: 180000 },
   ];
 
-  const filtered = statusFilter === 'all' ? samples : samples.filter(s => s.status === statusFilter);
-  const order = { unpaid: 0, unknown: 1, paid: 2 };
-  filtered.sort((a, b) => order[a.status] - order[b.status]);
+  const groups = {};
+  samples.forEach(s => {
+    if (!groups[s.teacher]) groups[s.teacher] = [];
+    groups[s.teacher].push(s);
+  });
 
-  const badgeMap = { paid: ['badge-paid','납부 ✓'], unpaid: ['badge-unpaid','미납'], unknown: ['badge-unknown','확인필요'] };
+  const teacherNames = Object.keys(groups).sort((a, b) => {
+    const ai = TEACHER_ORDER.indexOf(a), bi = TEACHER_ORDER.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
 
-  list.innerHTML = `<div style="font-size:12px;color:var(--unknown);background:var(--unknown-bg);padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:10px">📋 임시 샘플 데이터 표시 중 — 회원을 등록하면 실제 데이터로 바뀌어요</div>` +
-    filtered.map(s => {
-      const [badgeClass, badgeText] = badgeMap[s.status];
-      return `
-        <div class="status-item ${s.status}">
-          <div class="status-top">
+  list.innerHTML = `<div style="font-size:12px;color:var(--unknown);background:var(--unknown-bg);padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:10px">📋 샘플 데이터 — 회원 등록 후 실제 데이터로 바뀌어요</div>` +
+    teacherNames.map(teacher => {
+      const items = groups[teacher];
+      items.sort((a, b) => ({ unpaid: 0, unknown: 1, paid: 2 }[a.status] - { unpaid: 0, unknown: 1, paid: 2 }[b.status]));
+      const gPaid = items.filter(i => i.status === 'paid').length;
+      const gUnpaid = items.filter(i => i.status === 'unpaid').length;
+      const gUnknown = items.filter(i => i.status === 'unknown').length;
+      const safeId = 'sg-sample-' + teacher.replace(/[\s()]/g, '-');
+
+      const rows = items.map(s => {
+        const badge = s.status === 'paid'
+          ? `<span class="s-badge paid">✅ 납부</span>`
+          : s.status === 'unpaid'
+          ? `<span class="s-badge unpaid">❌ 미납</span>`
+          : `<span class="s-badge unknown">⚠️ 확인필요</span>`;
+        return `
+          <div class="status-row">
             <div>
-              <span class="status-name">${s.name}</span>
-              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--primary);margin-left:8px">${s.mask}</span>
+              <div class="status-row-name">${s.name}</div>
+              <div class="status-row-mask">${s.mask} <span style="color:var(--text3);font-family:'Noto Sans KR',sans-serif">${s.memo}</span></div>
             </div>
-            <span class="status-badge ${badgeClass}">${badgeText}</span>
+            <div class="status-row-amount">${s.amount ? s.amount.toLocaleString()+'원' : '-'}</div>
+            <div style="font-size:11px;color:var(--text3);text-align:center">${s.date}</div>
+            <div class="status-row-badge">${badge}</div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="status-teacher-group open" id="${safeId}">
+          <div class="status-teacher-header" onclick="toggleStatusGroup('${safeId}')">
+            <div class="status-teacher-name">👨‍🏫 ${teacher}</div>
+            <div class="status-teacher-summary">
+              ${gPaid > 0 ? `<span style="background:var(--paid-bg);color:var(--paid);padding:2px 7px;border-radius:10px;font-weight:700">✅${gPaid}</span>` : ''}
+              ${gUnpaid > 0 ? `<span style="background:var(--unpaid-bg);color:var(--unpaid);padding:2px 7px;border-radius:10px;font-weight:700">❌${gUnpaid}</span>` : ''}
+              ${gUnknown > 0 ? `<span style="background:var(--unknown-bg);color:var(--unknown);padding:2px 7px;border-radius:10px;font-weight:700">⚠️${gUnknown}</span>` : ''}
+              <span class="status-teacher-arrow">▼</span>
+            </div>
           </div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:4px">👨‍🏫 ${s.teacher}</div>
-          ${s.status === 'paid' ? `<div class="status-detail">${s.datetime} · ${s.amount.toLocaleString()}원</div>` : ''}
-          ${s.status === 'unknown' ? `
-            <div class="status-detail" style="margin-bottom:6px">👇 클릭해서 매칭 확인 (샘플)</div>
-            <div class="status-candidates">
-              <span class="candidate-tag">${s.mask} ${s.amount.toLocaleString()}원</span>
-            </div>` : ''}
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">${s.memo}</div>
-        </div>
-      `;
+          <div class="status-teacher-body">
+            <div class="status-col-header">
+              <span>이름</span><span style="text-align:right">금액</span><span style="text-align:center">날짜</span><span style="text-align:center">상태</span>
+            </div>
+            ${rows}
+          </div>
+        </div>`;
     }).join('');
 }
 function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag-over'); }
@@ -844,9 +910,12 @@ async function analyzeImage() {
   document.getElementById('result-card').style.display = 'block';
 
   const prompt = `이 이미지는 동백전(부산 지역화폐) 결제 화면 캡처입니다.
-이미지에서 다음 정보를 찾아서 JSON 형식으로만 답해주세요:
-{"date":"YYYY-MM-DD","time":"HH:MM","payer":"김*수 형태의 마스킹 이름","amount":숫자만,"memberName":"결제자 실명(있으면)","teacher":"담당선생님이름(있으면)"}
-찾지 못한 경우 null. JSON만 응답하세요.`;
+이미지에서 결제 날짜, 결제 시간, 결제자 이름(마스킹된 형태 예: 김*수), 결제 금액을 찾아주세요.
+
+반드시 아래 JSON 형식으로만 응답하세요. 다른 말은 하지 마세요:
+{"date":"YYYY-MM-DD","time":"HH:MM","payer":"마스킹이름","amount":숫자}
+
+찾지 못한 항목은 null로 하세요.`;
 
   try {
     const response = await fetch(
@@ -855,8 +924,17 @@ async function analyzeImage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: pendingImageBase64 } }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 256 }
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: 'image/jpeg', data: pendingImageBase64 } }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 512,
+            responseMimeType: 'application/json'
+          }
         })
       }
     );
@@ -867,33 +945,59 @@ async function analyzeImage() {
     }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('응답에서 데이터를 찾지 못했어요');
-    const result = JSON.parse(jsonMatch[0]);
 
+    // 응답에서 텍스트 추출 (여러 parts 대응)
+    let text = '';
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.text) { text += part.text; }
+    }
+    text = text.trim();
+
+    if (!text) throw new Error('Gemini 응답이 비어있어요. 사진을 다시 확인해주세요.');
+
+    // JSON 파싱 — 코드블록, 앞뒤 텍스트 제거
+    let result = null;
+    try {
+      // 1차: 전체를 JSON으로 파싱
+      result = JSON.parse(text);
+    } catch {
+      // 2차: ```json ... ``` 블록 추출
+      const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlock) {
+        try { result = JSON.parse(codeBlock[1].trim()); } catch {}
+      }
+    }
+    if (!result) {
+      // 3차: { ... } 패턴 추출
+      const jsonMatch = text.match(/\{[\s\S]*?\}/);
+      if (jsonMatch) {
+        try { result = JSON.parse(jsonMatch[0]); } catch {}
+      }
+    }
+    if (!result) {
+      // 4차: 텍스트에서 직접 값 추출 시도
+      result = extractFromText(text);
+    }
+    if (!result) {
+      throw new Error(`인식 결과를 읽지 못했어요.\n원본 응답: ${text.slice(0, 100)}`);
+    }
+
+    // 결과 채우기
     if (result.date) document.getElementById('r-date').value = result.date;
     if (result.time) document.getElementById('r-time').value = result.time;
     if (result.payer) document.getElementById('r-payer').value = result.payer;
     if (result.amount) setCaptureFeeDropdown(result.amount);
-    if (result.memberName) document.getElementById('r-member-name').value = result.memberName;
 
-    // 선생님 매칭 시도 (인식된 이름이 드롭다운 목록에 있으면 자동 선택)
-    if (result.teacher) {
-      const teacherSelect = document.getElementById('r-teacher');
-      const opts = Array.from(teacherSelect.options).map(o => o.value);
-      if (opts.includes(result.teacher)) teacherSelect.value = result.teacher;
-    }
-
-    // 회원 명단에서 마스킹 패턴으로 자동 매칭 시도
-    if (result.payer && !result.memberName) {
+    // 마스킹 이름으로 회원 자동 매칭 시도
+    if (result.payer) {
       const cands = getCandidates(result.payer);
       if (cands.length === 1) {
         document.getElementById('r-member-name').value = cands[0].name;
-        if (cands[0].teacher) {
-          const teacherSelect = document.getElementById('r-teacher');
-          const opts = Array.from(teacherSelect.options).map(o => o.value);
-          if (opts.includes(cands[0].teacher)) teacherSelect.value = cands[0].teacher;
+        const teacherSelect = document.getElementById('r-teacher');
+        const opts = Array.from(teacherSelect.options).map(o => o.value);
+        if (cands[0].teacher && opts.includes(cands[0].teacher)) {
+          teacherSelect.value = cands[0].teacher;
         }
       }
     }
@@ -917,8 +1021,24 @@ async function analyzeImage() {
   } catch (err) {
     statusEl.className = 'ai-status error';
     statusEl.textContent = `❌ 오류: ${err.message}`;
+    console.error('Gemini 오류:', err);
   }
 }
+
+// 텍스트에서 직접 값 추출 (JSON 파싱 실패 시 백업)
+function extractFromText(text) {
+  const result = {};
+  const dateMatch = text.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if (dateMatch) result.date = `${dateMatch[1]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[3]).padStart(2,'0')}`;
+  const timeMatch = text.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (timeMatch) result.time = `${String(timeMatch[1]).padStart(2,'0')}:${timeMatch[2]}`;
+  const payerMatch = text.match(/[가-힣]\*[가-힣]/);
+  if (payerMatch) result.payer = payerMatch[0];
+  const amountMatch = text.match(/(\d{1,3}(?:,\d{3})*|\d+)(?:\s*원)/);
+  if (amountMatch) result.amount = parseInt(amountMatch[1].replace(/,/g, ''));
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 
 function saveFromCapture() {
   const date = document.getElementById('r-date').value;
