@@ -10,7 +10,6 @@ let db = {
 
 let currentTab = 'members';
 let statusMonth = new Date().toISOString().slice(0, 7);
-let statusFilter = 'all';
 let pendingImageBase64 = null;
 
 // ===== 초기화 =====
@@ -56,12 +55,14 @@ function switchTab(tab) {
   if (tab === 'payments') renderPayments();
 }
 
-// ===== 입력 모드 전환 (수동/캡처) =====
+// ===== 입력 모드 전환 (수동/캡처/일괄) =====
 function switchInputMode(mode) {
-  document.getElementById('input-manual').style.display = mode === 'manual' ? 'block' : 'none';
-  document.getElementById('input-capture').style.display = mode === 'capture' ? 'block' : 'none';
-  document.getElementById('mode-manual').classList.toggle('active', mode === 'manual');
-  document.getElementById('mode-capture').classList.toggle('active', mode === 'capture');
+  ['manual', 'capture', 'bulk'].forEach(m => {
+    const el = document.getElementById(`input-${m}`);
+    const btn = document.getElementById(`mode-${m}`);
+    if (el) el.style.display = m === mode ? 'block' : 'none';
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
   if (mode === 'capture') updateCaptureUI();
 }
 
@@ -112,6 +113,11 @@ function addMember() {
 
   db.members.push({ id: Date.now(), name, mask, fee, teacher, memo, createdAt: new Date().toISOString() });
   saveData(); renderMembers(); clearMemberForm();
+  // 추가 후 폼 닫기
+  const form = document.getElementById('member-add-form');
+  const btn = document.getElementById('add-toggle-btn');
+  if (form) form.style.display = 'none';
+  if (btn) btn.classList.remove('active');
   showToast(`${name} 회원이 추가됐어요`);
 }
 
@@ -139,31 +145,72 @@ function deleteMember(id) {
   });
 }
 
+// ===== 회원 검색/추가 폼 토글 =====
+function toggleMemberSearch() {
+  const bar = document.getElementById('member-search-bar');
+  const btn = document.getElementById('search-toggle-btn');
+  const isOpen = bar.style.display !== 'none';
+  if (isOpen) {
+    bar.style.display = 'none';
+    btn.classList.remove('active');
+    // 검색 초기화
+    document.getElementById('member-search').value = '';
+    document.getElementById('member-search-results').style.display = 'none';
+    renderTeacherGroups();
+  } else {
+    bar.style.display = 'block';
+    btn.classList.add('active');
+    document.getElementById('member-search').focus();
+  }
+}
+
+function toggleMemberAddForm() {
+  const form = document.getElementById('member-add-form');
+  const btn = document.getElementById('add-toggle-btn');
+  const isOpen = form.style.display !== 'none';
+  form.style.display = isOpen ? 'none' : 'block';
+  btn.classList.toggle('active', !isOpen);
+  if (!isOpen) {
+    // 폼 열 때 첫 번째 입력란에 포커스
+    setTimeout(() => document.getElementById('m-name')?.focus(), 100);
+  }
+}
+
 function renderMembers() {
   const query = (document.getElementById('member-search')?.value || '').trim().toLowerCase();
-  const list = document.getElementById('member-list');
+
+  // 카운트는 항상 전체 회원 수로 표시
   document.getElementById('member-count').textContent = `${db.members.length}명`;
 
-  let filtered = db.members;
-  if (query) {
-    filtered = filtered.filter(m =>
-      m.name.includes(query) ||
-      (m.mask && m.mask.includes(query)) ||
-      (m.teacher && m.teacher.toLowerCase().includes(query)) ||
-      (m.memo && m.memo.includes(query))
-    );
+  const resultsDiv = document.getElementById('member-search-results');
+  const list = document.getElementById('member-list');
+
+  if (!query) {
+    // 검색어 없으면 결과창 숨기고 선생님별 리스트 표시
+    if (resultsDiv) resultsDiv.style.display = 'none';
+    renderTeacherGroups();
+    return;
   }
 
+  // 검색어 있으면 결과창 표시
+  if (resultsDiv) resultsDiv.style.display = 'block';
+
+  const filtered = db.members.filter(m =>
+    m.name.includes(query) ||
+    (m.mask && m.mask.includes(query)) ||
+    (m.teacher && m.teacher.toLowerCase().includes(query)) ||
+    (m.memo && m.memo.includes(query))
+  );
+
   if (!filtered.length) {
-    list.innerHTML = `<div class="list-empty">${query ? '검색 결과가 없어요' : '등록된 회원이 없어요'}</div>`;
-    renderTeacherGroups();
+    list.innerHTML = `<div class="list-empty">검색 결과가 없어요</div>`;
     return;
   }
 
   list.innerHTML = filtered.map(m => `
     <div class="member-item">
-      <div class="member-info">
-        <div class="member-name">${m.name}</div>
+      <div class="member-info" style="cursor:pointer" onclick="openMemberHistory(${m.id})">
+        <div class="member-name">${m.name} <span style="font-size:11px;color:var(--primary)">📋</span></div>
         <div class="member-meta">
           ${m.mask ? `<span class="member-mask">${m.mask}</span>` : ''}
           ${m.fee ? `<span class="member-fee">${m.fee.toLocaleString()}원/월</span>` : ''}
@@ -172,11 +219,11 @@ function renderMembers() {
         </div>
       </div>
       <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openMemberHistory(${m.id})">이력</button>
         <button class="btn btn-danger btn-sm" onclick="deleteMember(${m.id})">삭제</button>
       </div>
     </div>
   `).join('');
-  renderTeacherGroups();
 }
 
 // ===== 선생님별 그룹 리스트 =====
@@ -229,14 +276,23 @@ function renderTeacherGroups() {
             ${students.map(s => `
               <div class="teacher-student-item">
                 <div style="flex:1">
-                  <div class="teacher-student-name">${s.name}</div>
+                  <div class="teacher-student-name" style="${!isSample ? 'cursor:pointer;color:var(--primary)' : ''}" ${!isSample ? `onclick="openMemberHistory(${s.id})"` : ''}>${s.name}${!isSample ? ' 📋' : ''}</div>
                   <div class="teacher-student-info">
                     ${s.mask ? `<span style="font-family:'JetBrains Mono',monospace;color:var(--primary)">${s.mask}</span>` : ''}
                     ${s.fee ? ` · ${s.fee.toLocaleString()}원/월` : ''}
-                    ${s.memo ? ` · ${s.memo}` : ''}
+                    <span id="memo-display-${s.id}" style="color:var(--text3)">${s.memo ? ' · ' + s.memo : ''}</span>
+                    <span id="memo-edit-${s.id}" style="display:none;align-items:center;gap:4px;margin-top:2px">
+                      <input type="text" id="memo-input-${s.id}" value="${s.memo || ''}" placeholder="메모"
+                        style="height:26px;padding:0 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:100px;background:var(--surface);color:var(--text)">
+                      <button onclick="saveMemoInline(${s.id})" style="height:26px;padding:0 6px;font-size:11px;border:1px solid var(--paid);border-radius:4px;background:var(--paid-bg);color:var(--paid);cursor:pointer">저장</button>
+                      <button onclick="cancelMemoEdit(${s.id})" style="height:26px;padding:0 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer">취소</button>
+                    </span>
                   </div>
                 </div>
-                ${!isSample ? `<button class="btn btn-danger btn-sm" style="margin-left:8px;flex-shrink:0" onclick="deleteMember(${s.id})">삭제</button>` : ''}
+                <div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px">
+                  ${!isSample ? `<button class="btn btn-ghost btn-sm" style="height:26px;padding:0 6px;font-size:11px" onclick="startMemoEdit(${s.id})" title="메모 수정">✏️</button>` : ''}
+                  ${!isSample ? `<button class="btn btn-danger btn-sm" onclick="deleteMember(${s.id})">삭제</button>` : ''}
+                </div>
               </div>
             `).join('')}
           </div>
@@ -676,11 +732,6 @@ function selectPickerMonth(ym) {
   renderStatus();
 }
 
-function setFilter(f, btn) {
-  statusFilter = f;
-  renderStatus();
-}
-
 function renderStatus() {
   if (currentTab !== 'status') return;
   const list = document.getElementById('status-list');
@@ -706,8 +757,12 @@ function renderStatus() {
   document.getElementById('s-unpaid').textContent = unpaid;
   document.getElementById('s-unknown').textContent = unknown;
 
+  // 납부율 바 + 미납 뱃지 업데이트
+  updatePaymentRate(paid, db.members.length);
+  updateUnpaidBadge();
+
   // 필터 적용
-  const filtered = statusFilter === 'all' ? items : items.filter(i => i.status === statusFilter);
+  const filtered = items;
   if (!filtered.length) {
     list.innerHTML = `<div class="list-empty">해당 항목이 없어요</div>`;
     return;
@@ -773,7 +828,7 @@ function renderStatus() {
       return `
         <div class="status-row" style="${status === 'paid' ? '' : status === 'unpaid' ? 'opacity:0.75' : ''}">
           <div>
-            <div class="status-row-name">${m.name} ${cancelBtn}</div>
+            <div class="status-row-name" style="cursor:pointer;color:var(--primary)" onclick="openMemberHistory(${m.id})" title="납부 이력 보기">${m.name} 📋 ${cancelBtn}</div>
             <div class="status-row-mask">${m.mask || ''} ${m.memo ? `<span style="color:var(--text3);font-family:'Noto Sans KR',sans-serif">${m.memo}</span>` : ''}</div>
           </div>
           <div class="status-row-amount">${amountText}</div>
@@ -1275,6 +1330,174 @@ function handleImport(e) {
   };
   reader.readAsText(file);
 }
+
+// ===== ① 미납 뱃지 업데이트 =====
+function updateUnpaidBadge() {
+  const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(statusMonth));
+  const unpaidCount = db.members.filter(m =>
+    !monthPayments.some(p => p.memberId === m.id)
+  ).length;
+  const badge = document.getElementById('unpaid-badge');
+  if (!badge) return;
+  if (unpaidCount > 0 && db.members.length > 0) {
+    badge.textContent = unpaidCount;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ===== ② 납부율 바 업데이트 =====
+function updatePaymentRate(paid, total) {
+  const rate = total > 0 ? Math.round((paid / total) * 100) : 0;
+  const rateText = document.getElementById('payment-rate-text');
+  const rateFill = document.getElementById('payment-rate-fill');
+  if (!rateText || !rateFill) return;
+  rateText.textContent = `${rate}%`;
+  rateText.style.color = rate >= 80 ? 'var(--paid)' : rate >= 50 ? 'var(--unknown)' : 'var(--unpaid)';
+  rateFill.style.width = `${rate}%`;
+  rateFill.style.background = rate >= 80 ? 'var(--paid)' : rate >= 50 ? 'var(--unknown)' : 'var(--unpaid)';
+}
+
+// ===== ③ 결제 내역 일괄 입력 =====
+function parseBulkInput() {
+  const text = document.getElementById('bulk-input').value.trim();
+  if (!text) { showToast('내용을 입력하세요'); return; }
+
+  const today = new Date().toISOString().split('T')[0];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  let added = 0, failedLines = [];
+
+  lines.forEach(line => {
+    // 날짜: YYYY-MM-DD 또는 M/D 또는 MM/DD
+    let date = '';
+    const dateMatch = line.match(/(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})/);
+    const shortDateMatch = line.match(/(\d{1,2})[/.](\d{1,2})/);
+    if (dateMatch) {
+      date = dateMatch[1].replace(/[/.]/g, '-');
+    } else if (shortDateMatch) {
+      const year = new Date().getFullYear();
+      date = `${year}-${String(shortDateMatch[1]).padStart(2,'0')}-${String(shortDateMatch[2]).padStart(2,'0')}`;
+    }
+
+    // 시간
+    const timeMatch = line.match(/(\d{1,2}):(\d{2})/);
+    const time = timeMatch ? `${timeMatch[1].padStart(2,'0')}:${timeMatch[2]}` : '';
+
+    // 마스킹 이름
+    const payerMatch = line.match(/[가-힣]\*[가-힣]/);
+    const payer = payerMatch ? payerMatch[0] : '미확인';
+
+    // 금액: 18만원, 20만원, 180,000, 180000
+    let amount = 0;
+    const manMatch = line.match(/(\d+)\s*만/);
+    const wonMatch = line.match(/(\d[\d,]+)\s*원/);
+    const numMatch = line.match(/(\d{5,})/);
+    if (manMatch) {
+      amount = parseInt(manMatch[1]) * 10000;
+    } else if (wonMatch) {
+      amount = parseInt(wonMatch[1].replace(/,/g, ''));
+    } else if (numMatch) {
+      amount = parseInt(numMatch[1]);
+    }
+
+    if (!date && payer === '미확인') {
+      failedLines.push(line.slice(0, 25) + '…');
+      return;
+    }
+
+    const usedDate = date || today;
+    const datetime = `${usedDate}${time ? ' ' + time : ''}`;
+    db.payments.push({
+      id: Date.now() + added,
+      datetime, date: usedDate, time,
+      payer, amount, memberId: null,
+      createdAt: new Date().toISOString()
+    });
+    added++;
+  });
+
+  saveData(); renderPayments(); updateUnpaidBadge();
+
+  const resultDiv = document.getElementById('bulk-result');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = `<div style="background:${added > 0 ? 'var(--paid-bg)' : 'var(--unpaid-bg)'};padding:10px 12px;border-radius:var(--radius-sm);font-size:13px;line-height:1.8">
+    ✅ ${added}건 추가됨${failedLines.length > 0 ? `<br><span style="color:var(--unpaid)">❌ 인식 실패 ${failedLines.length}건</span>` : ''}
+  </div>`;
+  if (added > 0) showToast(`${added}건이 추가됐어요`);
+}
+
+// ===== ④ 회원 납부 이력 팝업 =====
+function openMemberHistory(memberId) {
+  const m = db.members.find(m => m.id === memberId);
+  if (!m) return;
+
+  document.getElementById('history-modal-title').textContent = `📋 ${m.name} 납부 이력`;
+
+  // 최근 6개월 목록
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  const paidMonths = months.filter(month =>
+    db.payments.some(p => p.memberId === m.id && p.date && p.date.startsWith(month))
+  ).length;
+
+  document.getElementById('history-modal-body').innerHTML = `
+    <div style="background:var(--surface2);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:13px;color:var(--text2)">
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--primary)">${m.mask || '-'}</span>
+      &nbsp;·&nbsp;${m.teacher || '-'}
+      &nbsp;·&nbsp;${m.fee ? m.fee.toLocaleString() + '원/월' : '-'}
+      <span style="float:right;font-weight:700;color:var(--paid)">${paidMonths}/6개월 납부</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${months.map(month => {
+        const mPay = db.payments.filter(p => p.memberId === m.id && p.date && p.date.startsWith(month));
+        const [y, mo] = month.split('-');
+        const label = `${y}년 ${parseInt(mo)}월`;
+        if (mPay.length > 0) {
+          const p = mPay[0];
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--paid-bg);border-radius:var(--radius-sm);border-left:3px solid var(--paid)">
+            <span style="font-size:13px;font-weight:500">${label}</span>
+            <div style="text-align:right">
+              <span style="color:var(--paid);font-weight:700;font-size:12px">✅ 납부</span>
+              <div style="font-size:11px;color:var(--text3)">${p.date || ''} ${p.amount ? p.amount.toLocaleString()+'원' : ''}</div>
+            </div>
+          </div>`;
+        } else {
+          return `<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid var(--border)">
+            <span style="font-size:13px;color:var(--text2)">${label}</span>
+            <span style="color:var(--text3);font-size:12px">미납</span>
+          </div>`;
+        }
+      }).join('')}
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:6px">✏️ 메모 수정</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="history-memo-input" value="${m.memo || ''}" placeholder="메모 입력"
+          style="flex:1;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;background:var(--surface);color:var(--text)">
+        <button class="btn btn-primary btn-sm" onclick="saveMemoFromHistory(${m.id})">저장</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('history-modal').style.display = 'flex';
+}
+
+function saveMemoFromHistory(memberId) {
+  const m = db.members.find(m => m.id === memberId);
+  if (!m) return;
+  m.memo = (document.getElementById('history-memo-input')?.value || '').trim();
+  saveData(); renderMembers();
+  closeHistoryModal();
+  showToast('메모가 저장됐어요');
+}
+
+function closeHistoryModal() { document.getElementById('history-modal').style.display = 'none'; }
+function closeHistoryModalOutside(e) { if (e.target === document.getElementById('history-modal')) closeHistoryModal(); }
 
 // ===== 월별 JSON 백업 =====
 function exportMonthlyJSON() {

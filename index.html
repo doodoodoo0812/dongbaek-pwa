@@ -34,7 +34,7 @@
         <span class="tab-icon">💳</span><span class="tab-label">결제등록</span>
       </button>
       <button class="tab-btn" onclick="switchTab('status')" id="tab-status">
-        <span class="tab-icon">✅</span><span class="tab-label">현황</span>
+        <span class="tab-icon">✅</span><span class="tab-label">현황<span id="unpaid-badge" style="display:none;background:#e24b4a;color:white;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:4px;font-weight:700"></span></span>
       </button>
     </nav>
 
@@ -42,77 +42,95 @@
 
       <!-- 회원 명단 -->
       <section id="panel-members" class="panel active">
-        <div class="panel-header">
-          <h2>회원 명단</h2>
-          <span class="count-badge" id="member-count">0명</span>
-        </div>
 
-        <!-- 검색 - 맨 위 -->
-        <div class="card">
-          <div class="search-bar">
-            <input type="text" id="member-search" placeholder="이름, 선생님, 메모로 검색..." oninput="renderMembers()">
+        <!-- 상단 헤더: 카운트 + 검색 + 추가 버튼 -->
+        <div class="member-topbar">
+          <div class="member-topbar-left">
+            <span class="member-topbar-title">회원 명단</span>
+            <span class="count-badge" id="member-count">0명</span>
           </div>
-          <div id="member-list" class="list-container"></div>
+          <div class="member-topbar-right">
+            <button class="icon-btn" onclick="toggleMemberSearch()" id="search-toggle-btn" title="검색">🔍</button>
+            <button class="icon-btn" onclick="toggleMemberAddForm()" id="add-toggle-btn" title="회원 추가">➕</button>
+          </div>
         </div>
 
-        <div class="card">
-          <h3 class="card-title">회원 추가</h3>
-          <div class="form-grid">
-            <div class="form-field">
-              <label>회원(학생) 이름 *</label>
-              <input type="text" id="m-name" placeholder="김철수" maxlength="10">
+        <!-- 검색창 (기본 숨김) -->
+        <div id="member-search-bar" style="display:none;margin-bottom:8px">
+          <input type="text" id="member-search" placeholder="이름, 선생님, 메모로 검색..." oninput="renderMembers()"
+            style="width:100%;height:38px;padding:0 12px;border:1px solid var(--primary);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:14px;background:var(--surface)">
+        </div>
+
+        <!-- 회원 추가 폼 (기본 숨김) -->
+        <div id="member-add-form" style="display:none">
+          <div class="card">
+            <h3 class="card-title">회원 추가</h3>
+            <div class="form-grid">
+              <div class="form-field">
+                <label>회원(학생) 이름 *</label>
+                <input type="text" id="m-name" placeholder="김철수" maxlength="10">
+              </div>
+              <div class="form-field">
+                <label>마스킹 패턴 *</label>
+                <input type="text" id="m-mask" placeholder="김*수" maxlength="10">
+                <span class="field-hint">* 하나가 글자 하나를 대체해요</span>
+              </div>
+              <div class="form-field">
+                <label>월 납부액</label>
+                <select id="m-fee-select" onchange="handleFeeSelect()">
+                  <option value="">선택하세요</option>
+                  <option value="180000">18만원</option>
+                  <option value="200000">20만원</option>
+                  <option value="custom">직접 입력</option>
+                </select>
+              </div>
+              <div class="form-field" id="m-fee-custom-wrap" style="display:none">
+                <label>납부액 직접 입력 (원)</label>
+                <input type="number" id="m-fee-custom" placeholder="예: 150000">
+              </div>
+              <div class="form-field">
+                <label>담당 선생님</label>
+                <select id="m-teacher">
+                  <option value="">선택하세요</option>
+                  <option value="지사장님">지사장님</option>
+                  <option value="최수정">최수정</option>
+                  <option value="김가영">김가영</option>
+                  <option value="이묘련">이묘련</option>
+                  <option value="김선미">김선미</option>
+                  <option value="이현주">이현주</option>
+                  <option value="김보온">김보온</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label>메모</label>
+                <input type="text" id="m-memo" placeholder="초등3학년">
+              </div>
             </div>
-            <div class="form-field">
-              <label>마스킹 패턴 *</label>
-              <input type="text" id="m-mask" placeholder="김*수" maxlength="10">
-              <span class="field-hint">* 하나가 글자 하나를 대체해요</span>
-            </div>
-            <div class="form-field">
-              <label>월 납부액</label>
-              <select id="m-fee-select" onchange="handleFeeSelect()">
-                <option value="">선택하세요</option>
-                <option value="180000">18만원</option>
-                <option value="200000">20만원</option>
-                <option value="custom">직접 입력</option>
-              </select>
-            </div>
-            <div class="form-field" id="m-fee-custom-wrap" style="display:none">
-              <label>납부액 직접 입력 (원)</label>
-              <input type="number" id="m-fee-custom" placeholder="예: 150000">
-            </div>
-            <div class="form-field">
-              <label>담당 선생님</label>
-              <select id="m-teacher">
-                <option value="">선택하세요</option>
-                <option value="지사장님">지사장님</option>
-                <option value="최수정">최수정</option>
-                <option value="김가영">김가영</option>
-                <option value="이묘련">이묘련</option>
-                <option value="김선미">김선미</option>
-                <option value="이현주">이현주</option>
-                <option value="김보온">김보온</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label>메모</label>
-              <input type="text" id="m-memo" placeholder="초등3학년">
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="addMember()">➕ 회원 추가</button>
+              <button class="btn btn-ghost" onclick="toggleMemberAddForm()">닫기</button>
             </div>
           </div>
-          <button class="btn btn-primary btn-full" onclick="addMember()">➕ 회원 추가</button>
-        </div>
 
-        <div class="card">
-          <h3 class="card-title">엑셀로 일괄 등록</h3>
-          <p class="card-desc">양식을 다운받아 작성 후 CSV로 저장해서 업로드하면 회원을 한 번에 등록할 수 있어요.</p>
-          <div class="btn-row">
-            <button class="btn btn-ghost" onclick="downloadExcelTemplate()">📥 엑셀 양식 다운로드</button>
-            <button class="btn btn-ghost" onclick="document.getElementById('excel-upload').click()">📤 작성한 CSV 업로드</button>
-            <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(event)">
+          <div class="card">
+            <h3 class="card-title">엑셀로 일괄 등록</h3>
+            <div class="btn-row">
+              <button class="btn btn-ghost" onclick="downloadExcelTemplate()">📥 양식 다운로드</button>
+              <button class="btn btn-ghost" onclick="document.getElementById('excel-upload').click()">📤 CSV/엑셀 업로드</button>
+              <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(event)">
+            </div>
+            <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 후 엑셀(.xlsx) 파일을 바로 업로드하세요</p>
           </div>
-          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 후 엑셀 파일(.xlsx)을 바로 업로드하세요</p>
         </div>
 
-        <!-- 선생님별 리스트 -->
+        <!-- 검색 결과 목록 (검색 중일 때만 표시) -->
+        <div id="member-search-results" style="display:none">
+          <div class="card" style="padding:8px">
+            <div id="member-list" class="list-container"></div>
+          </div>
+        </div>
+
+        <!-- 선생님별 리스트 (항상 표시) -->
         <div class="card">
           <div class="card-title" style="margin-bottom:12px">👨‍🏫 선생님별 학생 리스트</div>
           <div id="teacher-group-list"></div>
@@ -133,6 +151,9 @@
           </button>
           <button class="input-mode-btn" id="mode-capture" onclick="switchInputMode('capture')">
             📸 캡처 사진
+          </button>
+          <button class="input-mode-btn" id="mode-bulk" onclick="switchInputMode('bulk')">
+            📋 일괄 입력
           </button>
         </div>
 
@@ -256,6 +277,23 @@
           </div>
         </div>
 
+        <!-- ── 일괄 입력 ── -->
+        <div id="input-bulk" style="display:none">
+          <div class="card">
+            <h3 class="card-title">결제 내역 일괄 입력</h3>
+            <p class="card-desc">동백전 앱에서 결제 내역을 복사해서 아래에 붙여넣으세요.<br>한 줄에 하나씩, 날짜·결제자·금액이 포함된 텍스트를 인식해요.</p>
+            <textarea id="bulk-input" placeholder="예시:
+2025-03-05 14:22 김*수 180,000원
+2025-03-06 이*연 200000
+03/07 박*현 18만원" style="width:100%;height:140px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;resize:vertical;background:var(--surface);color:var(--text)"></textarea>
+            <div class="btn-row" style="margin-top:10px">
+              <button class="btn btn-primary" onclick="parseBulkInput()">📥 분석 및 추가</button>
+              <button class="btn btn-ghost" onclick="document.getElementById('bulk-input').value=''">초기화</button>
+            </div>
+            <div id="bulk-result" style="display:none;margin-top:10px"></div>
+          </div>
+        </div>
+
         <!-- ── 결제 내역 목록 ── -->
         <div class="card" style="margin-top:4px">
           <div class="month-filter">
@@ -301,6 +339,17 @@
           <div class="stat-card stat-unknown">
             <div class="stat-label">⚠️ 확인필요</div>
             <div class="stat-value" id="s-unknown">0</div>
+          </div>
+        </div>
+
+        <!-- 납부율 바 -->
+        <div id="payment-rate-bar" style="margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:500;color:var(--text2)">이번 달 납부율</span>
+            <span id="payment-rate-text" style="font-size:15px;font-weight:700;color:var(--paid)">0%</span>
+          </div>
+          <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+            <div id="payment-rate-fill" style="height:100%;background:var(--paid);border-radius:4px;transition:width 0.4s ease;width:0%"></div>
           </div>
         </div>
 
@@ -389,6 +438,17 @@
           <button class="btn btn-primary btn-full" id="confirm-ok">확인</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 회원 납부 이력 모달 -->
+  <div id="history-modal" class="modal-overlay" style="display:none" onclick="closeHistoryModalOutside(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="history-modal-title">📋 납부 이력</h3>
+        <button class="modal-close" onclick="closeHistoryModal()">✕</button>
+      </div>
+      <div class="modal-body" id="history-modal-body"></div>
     </div>
   </div>
 

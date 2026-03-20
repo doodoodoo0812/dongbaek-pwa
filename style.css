@@ -445,6 +445,24 @@ html, body {
 }
 .toast.show { opacity: 1; }
 
+/* ===== 회원 탭 상단바 ===== */
+.member-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; padding: 4px 0;
+}
+.member-topbar-left { display: flex; align-items: center; gap: 8px; }
+.member-topbar-title { font-size: 18px; font-weight: 700; }
+.member-topbar-right { display: flex; gap: 6px; }
+.icon-btn {
+  width: 36px; height: 36px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface2); cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--primary-light); border-color: var(--primary); }
+.icon-btn.active { background: var(--primary); border-color: var(--primary); }
+
 /* ===== 결제 등록 모드 선택 ===== */
 .input-mode-bar {
   display: flex; gap: 6px; margin-bottom: 12px;
