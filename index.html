@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="동백전 매칭">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>동백전 납부 매칭</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon">🌸</span>
+          <span class="logo-text">동백전 납부 매칭</span>
+        </div>
+        <button class="settings-btn" onclick="openSettings()" title="설정">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Tab Nav -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('members')" id="tab-members">
+        <span class="tab-icon">👥</span><span class="tab-label">회원</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('payments')" id="tab-payments">
+        <span class="tab-icon">💳</span><span class="tab-label">내역</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('capture')" id="tab-capture">
+        <span class="tab-icon">📸</span><span class="tab-label">캡처</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('status')" id="tab-status">
+        <span class="tab-icon">✅</span><span class="tab-label">현황</span>
+      </button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+
+      <!-- ===== 회원 명단 탭 ===== -->
+      <section id="panel-members" class="panel active">
+        <div class="panel-header">
+          <h2>회원 명단</h2>
+          <span class="count-badge" id="member-count">0명</span>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">회원 추가</h3>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>실명 *</label>
+              <input type="text" id="m-name" placeholder="김철수" maxlength="10">
+            </div>
+            <div class="form-field">
+              <label>마스킹 패턴 *</label>
+              <input type="text" id="m-mask" placeholder="김*수" maxlength="10">
+              <span class="field-hint">* 가 한 글자를 대체해요</span>
+            </div>
+            <div class="form-field">
+              <label>월 납부액</label>
+              <input type="number" id="m-fee" placeholder="50000">
+            </div>
+            <div class="form-field">
+              <label>메모</label>
+              <input type="text" id="m-memo" placeholder="초등3학년">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="addMember()">➕ 회원 추가</button>
+        </div>
+
+        <div class="card">
+          <div class="search-bar">
+            <input type="text" id="member-search" placeholder="이름으로 검색..." oninput="renderMembers()">
+          </div>
+          <div id="member-list" class="list-container"></div>
+        </div>
+      </section>
+
+      <!-- ===== 동백전 내역 탭 ===== -->
+      <section id="panel-payments" class="panel">
+        <div class="panel-header">
+          <h2>동백전 결제 내역</h2>
+          <span class="count-badge" id="payment-count">0건</span>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">내역 직접 입력</h3>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>결제 날짜</label>
+              <input type="date" id="p-date">
+            </div>
+            <div class="form-field">
+              <label>결제 시간</label>
+              <input type="time" id="p-time">
+            </div>
+            <div class="form-field">
+              <label>결제자 (마스킹)</label>
+              <input type="text" id="p-payer" placeholder="김*수">
+            </div>
+            <div class="form-field">
+              <label>금액</label>
+              <input type="number" id="p-amount" placeholder="50000">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="addPayment()">➕ 내역 추가</button>
+        </div>
+
+        <div class="card">
+          <div class="month-filter">
+            <label>월 선택</label>
+            <input type="month" id="payment-month" onchange="renderPayments()">
+          </div>
+          <div id="payment-list" class="list-container"></div>
+        </div>
+      </section>
+
+      <!-- ===== 캡처 인식 탭 ===== -->
+      <section id="panel-capture" class="panel">
+        <div class="panel-header">
+          <h2>캡처 사진 인식</h2>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">사진 업로드</h3>
+          <p class="card-desc">학부모에게 받은 동백전 결제 캡처를 올려주세요.<br>Gemini AI가 날짜·시간·금액·이름을 자동으로 읽어요.</p>
+
+          <!-- 드래그앤드롭 + 클릭 + 붙여넣기 영역 -->
+          <div class="upload-zone" id="upload-zone"
+               ondrop="handleDrop(event)"
+               ondragover="handleDragOver(event)"
+               ondragleave="handleDragLeave(event)"
+               onclick="document.getElementById('file-input').click()">
+            <div class="upload-icon">📷</div>
+            <div class="upload-text">클릭하거나 사진을 여기로 드래그</div>
+            <div class="upload-sub">또는 Ctrl+V 로 클립보드에서 붙여넣기</div>
+            <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+          </div>
+
+          <!-- 미리보기 -->
+          <div id="preview-area" style="display:none">
+            <img id="preview-img" class="preview-img" alt="미리보기">
+            <button class="btn btn-ghost btn-sm" onclick="clearPreview()">✕ 사진 제거</button>
+          </div>
+        </div>
+
+        <!-- 인식 결과 -->
+        <div class="card" id="result-card" style="display:none">
+          <h3 class="card-title">인식 결과</h3>
+          <div id="ai-status" class="ai-status"></div>
+          <div class="form-grid" id="result-form">
+            <div class="form-field">
+              <label>결제 날짜</label>
+              <input type="date" id="r-date">
+            </div>
+            <div class="form-field">
+              <label>결제 시간</label>
+              <input type="time" id="r-time">
+            </div>
+            <div class="form-field">
+              <label>결제자 (마스킹)</label>
+              <input type="text" id="r-payer" placeholder="김*수">
+            </div>
+            <div class="form-field">
+              <label>금액</label>
+              <input type="number" id="r-amount">
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveFromCapture()">💾 내역에 저장</button>
+            <button class="btn btn-ghost" onclick="analyzeImage()">🔄 다시 분석</button>
+          </div>
+        </div>
+
+        <div class="card" id="no-api-card" style="display:none">
+          <div class="warning-box">
+            <span>⚠️</span>
+            <div>
+              <strong>Gemini API 키가 없어요</strong>
+              <p>설정에서 API 키를 입력하면 자동 인식이 가능해요.</p>
+              <button class="btn btn-primary btn-sm" onclick="openSettings()">⚙️ 설정 열기</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 납부 현황 탭 ===== -->
+      <section id="panel-status" class="panel">
+        <div class="panel-header">
+          <h2>납부 현황</h2>
+        </div>
+
+        <div class="month-selector">
+          <button class="month-nav" onclick="changeMonth(-1)">◀</button>
+          <span class="month-display" id="status-month-display"></span>
+          <button class="month-nav" onclick="changeMonth(1)">▶</button>
+        </div>
+
+        <!-- 통계 카드 -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">전체</div>
+            <div class="stat-value" id="s-total">0</div>
+          </div>
+          <div class="stat-card stat-paid">
+            <div class="stat-label">납부</div>
+            <div class="stat-value" id="s-paid">0</div>
+          </div>
+          <div class="stat-card stat-unpaid">
+            <div class="stat-label">미납</div>
+            <div class="stat-value" id="s-unpaid">0</div>
+          </div>
+          <div class="stat-card stat-unknown">
+            <div class="stat-label">확인필요</div>
+            <div class="stat-value" id="s-unknown">0</div>
+          </div>
+        </div>
+
+        <!-- 매칭 실행 -->
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="runAutoMatch()">🔗 자동 매칭 실행</button>
+          <button class="btn btn-ghost" onclick="exportCSV()">📥 CSV 내보내기</button>
+        </div>
+
+        <!-- 필터 -->
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="setFilter('all', this)">전체</button>
+          <button class="filter-btn" onclick="setFilter('paid', this)">납부</button>
+          <button class="filter-btn" onclick="setFilter('unpaid', this)">미납</button>
+          <button class="filter-btn" onclick="setFilter('unknown', this)">확인필요</button>
+        </div>
+
+        <div id="status-list" class="list-container"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===== 설정 모달 ===== -->
+  <div id="settings-modal" class="modal-overlay" style="display:none" onclick="closeSettingsOutside(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⚙️ 설정</h3>
+        <button class="modal-close" onclick="closeSettings()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label>Gemini API 키</label>
+          <div class="api-key-input">
+            <input type="password" id="api-key-input" placeholder="AIza...">
+            <button class="btn btn-ghost btn-sm" onclick="toggleApiKeyVisibility()">👁</button>
+          </div>
+          <span class="field-hint">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>에서 무료로 발급받으세요
+          </span>
+        </div>
+
+        <div class="form-field">
+          <label>학원/업체명</label>
+          <input type="text" id="setting-name" placeholder="○○학원">
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="danger-zone">
+          <h4>데이터 관리</h4>
+          <button class="btn btn-danger btn-sm" onclick="exportAllData()">📤 전체 데이터 백업</button>
+          <button class="btn btn-ghost btn-sm" onclick="importData()">📥 데이터 복원</button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-full" onclick="saveSettings()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 매칭 확인 모달 ===== -->
+  <div id="match-modal" class="modal-overlay" style="display:none" onclick="closeMatchModalOutside(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🔗 매칭 확인</h3>
+        <button class="modal-close" onclick="closeMatchModal()">✕</button>
+      </div>
+      <div class="modal-body" id="match-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
