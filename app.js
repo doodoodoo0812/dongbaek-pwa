@@ -164,15 +164,15 @@ function renderMembers() {
 }
 
 // ===== 선생님별 그룹 리스트 =====
+const TEACHER_ORDER = ['지사장님', '최수정', '김가영', '이묘련', '김선미', '이현주', '김보온', '(담당 미지정)'];
+
 function renderTeacherGroups() {
   const container = document.getElementById('teacher-group-list');
   if (!container) return;
 
-  // 임시 샘플 데이터 표시 (회원이 없을 때)
   const source = db.members.length > 0 ? db.members : getSampleMembers();
   const isSample = db.members.length === 0;
 
-  // 선생님별 그룹핑
   const groups = {};
   source.forEach(m => {
     const teacher = m.teacher || '(담당 미지정)';
@@ -181,9 +181,11 @@ function renderTeacherGroups() {
   });
 
   const teacherNames = Object.keys(groups).sort((a, b) => {
-    if (a === '(담당 미지정)') return 1;
-    if (b === '(담당 미지정)') return -1;
-    return a.localeCompare(b);
+    const ai = TEACHER_ORDER.indexOf(a), bi = TEACHER_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
   });
 
   if (!teacherNames.length) {
@@ -191,16 +193,16 @@ function renderTeacherGroups() {
     return;
   }
 
-  container.innerHTML = (isSample ? `<div style="font-size:12px;color:var(--unknown);background:var(--unknown-bg);padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:10px">📋 회원이 없어 임시 샘플 데이터를 표시하고 있어요</div>` : '') +
+  container.innerHTML =
+    (isSample ? `<div style="font-size:12px;color:var(--unknown);background:var(--unknown-bg);padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:10px">📋 임시 샘플 데이터 표시 중 — 회원을 등록하면 실제 데이터로 바뀌어요</div>` : '') +
     teacherNames.map(teacher => {
       const students = groups[teacher];
-      const id = `tg-${teacher.replace(/\s/g, '-')}`;
+      const safeId = 'tg-' + teacher.replace(/[\s()]/g, '-');
       return `
-        <div class="teacher-group" id="${id}">
-          <div class="teacher-group-header" onclick="toggleTeacherGroup('${id}')">
+        <div class="teacher-group" id="${safeId}">
+          <div class="teacher-group-header" onclick="toggleTeacherGroup('${safeId}')">
             <div class="teacher-group-title">
-              <span>👨‍🏫</span>
-              <span>${teacher}</span>
+              <span>👨‍🏫</span><span>${teacher}</span>
             </div>
             <div class="teacher-group-meta">
               <span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:12px;font-weight:700">${students.length}명</span>
@@ -210,7 +212,7 @@ function renderTeacherGroups() {
           <div class="teacher-group-body">
             ${students.map(s => `
               <div class="teacher-student-item">
-                <div>
+                <div style="flex:1">
                   <div class="teacher-student-name">${s.name}</div>
                   <div class="teacher-student-info">
                     ${s.mask ? `<span style="font-family:'JetBrains Mono',monospace;color:var(--primary)">${s.mask}</span>` : ''}
@@ -218,6 +220,7 @@ function renderTeacherGroups() {
                     ${s.memo ? ` · ${s.memo}` : ''}
                   </div>
                 </div>
+                ${!isSample ? `<button class="btn btn-danger btn-sm" style="margin-left:8px;flex-shrink:0" onclick="deleteMember(${s.id})">삭제</button>` : ''}
               </div>
             `).join('')}
           </div>
@@ -233,35 +236,33 @@ function toggleTeacherGroup(id) {
 
 function getSampleMembers() {
   return [
-    { name: '김민준', mask: '김*준', fee: 180000, teacher: '박지수 선생님', memo: '초등4학년' },
-    { name: '이서연', mask: '이*연', fee: 200000, teacher: '박지수 선생님', memo: '중등1학년' },
-    { name: '최지우', mask: '최*우', fee: 180000, teacher: '박지수 선생님', memo: '초등6학년' },
-    { name: '정예린', mask: '정*린', fee: 200000, teacher: '김태양 선생님', memo: '고등1학년' },
-    { name: '한도윤', mask: '한*윤', fee: 180000, teacher: '김태양 선생님', memo: '중등3학년' },
-    { name: '오승현', mask: '오*현', fee: 200000, teacher: '김태양 선생님', memo: '고등2학년' },
-    { name: '윤하은', mask: '윤*은', fee: 180000, teacher: '이나래 선생님', memo: '초등5학년' },
-    { name: '임준호', mask: '임*호', fee: 180000, teacher: '이나래 선생님', memo: '초등3학년' },
-    { name: '강수아', mask: '강*아', fee: 200000, teacher: '', memo: '중등2학년' },
+    { id: -1,  name: '김민준', mask: '김*준', fee: 180000, teacher: '지사장님', memo: '초등4학년' },
+    { id: -2,  name: '이서연', mask: '이*연', fee: 200000, teacher: '지사장님', memo: '중등1학년' },
+    { id: -3,  name: '최지우', mask: '최*우', fee: 180000, teacher: '최수정',  memo: '초등6학년' },
+    { id: -4,  name: '정예린', mask: '정*린', fee: 200000, teacher: '최수정',  memo: '고등1학년' },
+    { id: -5,  name: '한도윤', mask: '한*윤', fee: 180000, teacher: '김가영',  memo: '중등3학년' },
+    { id: -6,  name: '오승현', mask: '오*현', fee: 200000, teacher: '이묘련',  memo: '고등2학년' },
+    { id: -7,  name: '윤하은', mask: '윤*은', fee: 180000, teacher: '김선미',  memo: '초등5학년' },
+    { id: -8,  name: '임준호', mask: '임*호', fee: 180000, teacher: '이현주',  memo: '초등3학년' },
+    { id: -9,  name: '강수아', mask: '강*아', fee: 200000, teacher: '김보온',  memo: '중등2학년' },
+    { id: -10, name: '박재현', mask: '박*현', fee: 180000, teacher: '',        memo: '고등3학년' },
   ];
 }
 
 
 function downloadExcelTemplate() {
-  const header = '회원(학생)이름,마스킹패턴,월납부액,담당선생님,메모';
-  const examples = [
-    '김철수,김*수,180000,홍길동 선생님,초등3학년',
-    '이영희,이*희,200000,김선생님,중등1학년',
-    '박민준,박*준,180000,,고등2학년'
-  ].join('\n');
-  const csv = '\uFEFF' + header + '\n' + examples;
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const b64 = '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';
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = '회원등록_양식.csv';
+  a.download = '회원등록_양식.xlsx';
   a.click();
   URL.revokeObjectURL(url);
-  showToast('양식이 다운로드됐어요');
+  showToast('엑셀 양식이 다운로드됐어요');
 }
 
 function handleExcelUpload(e) {
@@ -279,7 +280,8 @@ function handleExcelUpload(e) {
 
       rows.forEach(line => {
         const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
-        const [name, mask, feeStr, teacher, memo] = cols;
+        // 열 순서: 이름, 담당선생님, 마스킹패턴, 월납부액, 메모
+        const [name, teacher, mask, feeStr, memo] = cols;
         if (!name) return;
 
         if (db.members.find(m => m.name === name)) { skipped++; return; }
@@ -314,12 +316,50 @@ function handleExcelUpload(e) {
   e.target.value = '';
 }
 
+// ===== 결제 내역 금액 드롭다운 =====
+function handlePaymentFeeSelect() {
+  const sel = document.getElementById('p-fee-select').value;
+  const wrap = document.getElementById('p-fee-custom-wrap');
+  wrap.style.display = sel === 'custom' ? 'flex' : 'none';
+  if (sel !== 'custom') document.getElementById('p-amount').value = '';
+}
+function getPaymentFeeValue() {
+  const sel = document.getElementById('p-fee-select').value;
+  if (!sel) return 0;
+  if (sel === 'custom') return parseInt(document.getElementById('p-amount').value) || 0;
+  return parseInt(sel) || 0;
+}
+
+// ===== 캡처 금액 드롭다운 =====
+function handleCaptureFeeSelect() {
+  const sel = document.getElementById('r-fee-select').value;
+  const wrap = document.getElementById('r-fee-custom-wrap');
+  wrap.style.display = sel === 'custom' ? 'flex' : 'none';
+  if (sel !== 'custom') document.getElementById('r-amount').value = '';
+}
+function getCaptureFeeValue() {
+  const sel = document.getElementById('r-fee-select').value;
+  if (!sel) return 0;
+  if (sel === 'custom') return parseInt(document.getElementById('r-amount').value) || 0;
+  return parseInt(sel) || 0;
+}
+function setCaptureFeeDropdown(amount) {
+  const sel = document.getElementById('r-fee-select');
+  const wrap = document.getElementById('r-fee-custom-wrap');
+  if (amount === 180000) { sel.value = '180000'; wrap.style.display = 'none'; }
+  else if (amount === 200000) { sel.value = '200000'; wrap.style.display = 'none'; }
+  else if (amount) {
+    sel.value = 'custom'; wrap.style.display = 'flex';
+    document.getElementById('r-amount').value = amount;
+  }
+}
+
 // ===== 결제 내역 =====
 function addPayment() {
   const date = document.getElementById('p-date').value;
   const time = document.getElementById('p-time').value;
   const payer = document.getElementById('p-payer').value.trim();
-  const amount = parseInt(document.getElementById('p-amount').value) || 0;
+  const amount = getPaymentFeeValue();
 
   if (!date && !payer) { showToast('날짜 또는 결제자를 입력하세요'); return; }
 
@@ -353,7 +393,9 @@ function pushPayment(date, time, payer, amount) {
   db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId: null, createdAt: new Date().toISOString() });
   saveData(); renderPayments();
   document.getElementById('p-payer').value = '';
+  document.getElementById('p-fee-select').value = '';
   document.getElementById('p-amount').value = '';
+  document.getElementById('p-fee-custom-wrap').style.display = 'none';
   showToast('내역이 추가됐어요');
 }
 
@@ -506,6 +548,8 @@ function runAutoMatch() {
 }
 
 // ===== 납부 현황 =====
+let pickerYear = new Date().getFullYear();
+
 function setMonth(ym) {
   statusMonth = ym;
   const [y, m] = ym.split('-');
@@ -520,6 +564,46 @@ function changeMonth(delta) {
   renderStatus();
 }
 
+// ===== 월 달력 피커 =====
+function toggleMonthPicker() {
+  const picker = document.getElementById('month-picker');
+  if (picker.style.display === 'none') {
+    pickerYear = parseInt(statusMonth.split('-')[0]);
+    renderMonthPicker();
+    picker.style.display = 'block';
+  } else {
+    picker.style.display = 'none';
+  }
+}
+
+function changePickerYear(delta) {
+  pickerYear += delta;
+  renderMonthPicker();
+}
+
+function renderMonthPicker() {
+  document.getElementById('picker-year').textContent = `${pickerYear}년`;
+  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const curM = statusMonth;
+  document.getElementById('picker-months').innerHTML = months.map((label, i) => {
+    const ym = `${pickerYear}-${String(i+1).padStart(2,'0')}`;
+    const isActive = ym === curM;
+    return `<button onclick="selectPickerMonth('${ym}')"
+      style="padding:8px 4px;border-radius:var(--radius-sm);border:1px solid ${isActive ? 'var(--primary)' : 'var(--border)'};
+      background:${isActive ? 'var(--primary)' : 'transparent'};
+      color:${isActive ? 'white' : 'var(--text-primary)'};
+      font-family:'Noto Sans KR',sans-serif;font-size:13px;cursor:pointer;font-weight:${isActive ? '700' : '400'}"
+    >${label}</button>`;
+  }).join('');
+}
+
+function selectPickerMonth(ym) {
+  document.getElementById('month-picker').style.display = 'none';
+  statusMonth = ym;
+  setMonth(ym);
+  renderStatus();
+}
+
 function setFilter(f, btn) {
   statusFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -530,6 +614,13 @@ function setFilter(f, btn) {
 function renderStatus() {
   if (currentTab !== 'status') return;
   const list = document.getElementById('status-list');
+
+  // 회원이 없으면 임시 예시 표시
+  if (db.members.length === 0) {
+    renderSampleStatus();
+    return;
+  }
+
   const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(statusMonth));
 
   let paid = 0, unpaid = 0, unknown = 0;
@@ -607,7 +698,57 @@ function renderStatus() {
   }).join('');
 }
 
-// ===== 이미지 업로드 =====
+// ===== 현황 임시 예시 =====
+function renderSampleStatus() {
+  const list = document.getElementById('status-list');
+  document.getElementById('s-total').textContent = '10';
+  document.getElementById('s-paid').textContent = '6';
+  document.getElementById('s-unpaid').textContent = '2';
+  document.getElementById('s-unknown').textContent = '2';
+
+  const samples = [
+    { name: '김민준', mask: '김*준', teacher: '지사장님', memo: '초등4학년', status: 'unpaid', datetime: '', amount: 0 },
+    { name: '이서연', mask: '이*연', teacher: '지사장님', memo: '중등1학년', status: 'unknown', datetime: '2025-03-05 14:22', amount: 200000 },
+    { name: '최지우', mask: '최*우', teacher: '최수정',  memo: '초등6학년', status: 'paid',    datetime: '2025-03-03 10:15', amount: 180000 },
+    { name: '정예린', mask: '정*린', teacher: '최수정',  memo: '고등1학년', status: 'paid',    datetime: '2025-03-07 16:40', amount: 200000 },
+    { name: '한도윤', mask: '한*윤', teacher: '김가영',  memo: '중등3학년', status: 'paid',    datetime: '2025-03-02 09:30', amount: 180000 },
+    { name: '오승현', mask: '오*현', teacher: '이묘련',  memo: '고등2학년', status: 'unpaid',  datetime: '', amount: 0 },
+    { name: '윤하은', mask: '윤*은', teacher: '김선미',  memo: '초등5학년', status: 'paid',    datetime: '2025-03-10 11:05', amount: 180000 },
+    { name: '임준호', mask: '임*호', teacher: '이현주',  memo: '초등3학년', status: 'unknown', datetime: '2025-03-08 15:33', amount: 180000 },
+    { name: '강수아', mask: '강*아', teacher: '김보온',  memo: '중등2학년', status: 'paid',    datetime: '2025-03-04 13:20', amount: 200000 },
+    { name: '박재현', mask: '박*현', teacher: '김보온',  memo: '고등3학년', status: 'paid',    datetime: '2025-03-06 17:55', amount: 180000 },
+  ];
+
+  const filtered = statusFilter === 'all' ? samples : samples.filter(s => s.status === statusFilter);
+  const order = { unpaid: 0, unknown: 1, paid: 2 };
+  filtered.sort((a, b) => order[a.status] - order[b.status]);
+
+  const badgeMap = { paid: ['badge-paid','납부 ✓'], unpaid: ['badge-unpaid','미납'], unknown: ['badge-unknown','확인필요'] };
+
+  list.innerHTML = `<div style="font-size:12px;color:var(--unknown);background:var(--unknown-bg);padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:10px">📋 임시 샘플 데이터 표시 중 — 회원을 등록하면 실제 데이터로 바뀌어요</div>` +
+    filtered.map(s => {
+      const [badgeClass, badgeText] = badgeMap[s.status];
+      return `
+        <div class="status-item ${s.status}">
+          <div class="status-top">
+            <div>
+              <span class="status-name">${s.name}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--primary);margin-left:8px">${s.mask}</span>
+            </div>
+            <span class="status-badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:4px">👨‍🏫 ${s.teacher}</div>
+          ${s.status === 'paid' ? `<div class="status-detail">${s.datetime} · ${s.amount.toLocaleString()}원</div>` : ''}
+          ${s.status === 'unknown' ? `
+            <div class="status-detail" style="margin-bottom:6px">👇 클릭해서 매칭 확인 (샘플)</div>
+            <div class="status-candidates">
+              <span class="candidate-tag">${s.mask} ${s.amount.toLocaleString()}원</span>
+            </div>` : ''}
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">${s.memo}</div>
+        </div>
+      `;
+    }).join('');
+}
 function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag-over'); }
 function handleDragLeave() { document.getElementById('upload-zone').classList.remove('drag-over'); }
 function handleDrop(e) {
@@ -653,7 +794,10 @@ function clearPreview() {
   document.getElementById('no-api-card').style.display = 'none';
   document.getElementById('file-input').value = '';
   document.getElementById('ai-warnings').innerHTML = '';
-  ['r-date', 'r-time', 'r-payer', 'r-amount'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('r-fee-select').value = '';
+  document.getElementById('r-fee-custom-wrap').style.display = 'none';
+  document.getElementById('r-teacher').value = '';
+  ['r-date', 'r-time', 'r-payer', 'r-amount', 'r-member-name'].forEach(id => document.getElementById(id).value = '');
 }
 
 function updateCaptureUI() {
@@ -676,12 +820,12 @@ async function analyzeImage() {
 
   const prompt = `이 이미지는 동백전(부산 지역화폐) 결제 화면 캡처입니다.
 이미지에서 다음 정보를 찾아서 JSON 형식으로만 답해주세요:
-{"date":"YYYY-MM-DD","time":"HH:MM","payer":"김*수 형태의 마스킹 이름","amount":숫자만}
+{"date":"YYYY-MM-DD","time":"HH:MM","payer":"김*수 형태의 마스킹 이름","amount":숫자만,"memberName":"결제자 실명(있으면)","teacher":"담당선생님이름(있으면)"}
 찾지 못한 경우 null. JSON만 응답하세요.`;
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${db.settings.apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${db.settings.apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -706,7 +850,28 @@ async function analyzeImage() {
     if (result.date) document.getElementById('r-date').value = result.date;
     if (result.time) document.getElementById('r-time').value = result.time;
     if (result.payer) document.getElementById('r-payer').value = result.payer;
-    if (result.amount) document.getElementById('r-amount').value = result.amount;
+    if (result.amount) setCaptureFeeDropdown(result.amount);
+    if (result.memberName) document.getElementById('r-member-name').value = result.memberName;
+
+    // 선생님 매칭 시도 (인식된 이름이 드롭다운 목록에 있으면 자동 선택)
+    if (result.teacher) {
+      const teacherSelect = document.getElementById('r-teacher');
+      const opts = Array.from(teacherSelect.options).map(o => o.value);
+      if (opts.includes(result.teacher)) teacherSelect.value = result.teacher;
+    }
+
+    // 회원 명단에서 마스킹 패턴으로 자동 매칭 시도
+    if (result.payer && !result.memberName) {
+      const cands = getCandidates(result.payer);
+      if (cands.length === 1) {
+        document.getElementById('r-member-name').value = cands[0].name;
+        if (cands[0].teacher) {
+          const teacherSelect = document.getElementById('r-teacher');
+          const opts = Array.from(teacherSelect.options).map(o => o.value);
+          if (opts.includes(cands[0].teacher)) teacherSelect.value = cands[0].teacher;
+        }
+      }
+    }
 
     // 인식 불완전 경고
     const missing = [];
@@ -734,24 +899,36 @@ function saveFromCapture() {
   const date = document.getElementById('r-date').value;
   const time = document.getElementById('r-time').value;
   const payer = document.getElementById('r-payer').value.trim();
-  const amount = parseInt(document.getElementById('r-amount').value) || 0;
+  const amount = getCaptureFeeValue();
+  const memberName = document.getElementById('r-member-name').value.trim();
+  const teacher = document.getElementById('r-teacher').value;
 
   if (!date || !payer) {
     showConfirm('⚠️ 정보 불완전', '날짜 또는 결제자 이름이 없어요.\n불완전한 정보로 저장할까요?',
       `날짜: ${date || '(없음)'}\n결제자: ${payer || '(없음)'}\n금액: ${amount ? amount.toLocaleString() + '원' : '(없음)'}`,
-      () => {
-        const datetime = date ? `${date}${time ? ' ' + time : ''}` : '';
-        db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId: null, createdAt: new Date().toISOString() });
-        saveData(); clearPreview(); switchTab('payments');
-        showToast('내역에 저장됐어요');
-      });
+      () => doSaveCapture(date, time, payer, amount, memberName, teacher));
     return;
   }
+  doSaveCapture(date, time, payer, amount, memberName, teacher);
+}
 
+function doSaveCapture(date, time, payer, amount, memberName, teacher) {
   const datetime = date ? `${date}${time ? ' ' + time : ''}` : '';
-  db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId: null, createdAt: new Date().toISOString() });
+
+  // 회원 이름으로 memberId 자동 매칭 시도
+  let memberId = null;
+  if (memberName) {
+    const found = db.members.find(m => m.name === memberName);
+    if (found) memberId = found.id;
+  }
+  if (!memberId && payer) {
+    const cands = getCandidates(payer);
+    if (cands.length === 1) memberId = cands[0].id;
+  }
+
+  db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId, createdAt: new Date().toISOString() });
   saveData(); clearPreview(); switchTab('payments');
-  showToast('내역에 저장됐어요!');
+  showToast(memberId ? `내역 저장 및 ${db.members.find(m=>m.id===memberId)?.name} 매칭 완료!` : '내역에 저장됐어요!');
 }
 
 // ===== 매칭 모달 (후보 여러 명) =====
@@ -794,7 +971,6 @@ function closeSettingsOutside(e) { if (e.target === document.getElementById('set
 
 function saveSettings() {
   db.settings.apiKey = document.getElementById('api-key-input').value.trim();
-  db.settings.orgName = document.getElementById('setting-name').value.trim();
   saveData(); closeSettings(); updateCaptureUI();
   showToast('설정이 저장됐어요');
 }
@@ -844,10 +1020,10 @@ function exportAllData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `dongbaek_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `동백전_전체백업_${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('백업 파일이 다운로드됐어요');
+  showToast('전체 백업 파일이 다운로드됐어요');
 }
 
 function importData() { document.getElementById('import-file').click(); }
@@ -869,30 +1045,72 @@ function handleImport(e) {
   reader.readAsText(file);
 }
 
-// ===== CSV 내보내기 =====
-function exportCSV() {
-  const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(statusMonth));
-  const rows = [['회원(학생)이름', '마스킹', '담당선생님', '상태', '결제일시', '금액', '등록납부액', '메모']];
+// ===== 월별 JSON 백업 =====
+function exportMonthlyJSON() {
+  const month = document.getElementById('backup-month').value || statusMonth;
+  if (!month) { showToast('월을 선택하세요'); return; }
+  const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(month));
+  const payload = { month, members: db.members, payments: monthPayments, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `동백전_${month}_백업.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`${month} 월별 백업이 완료됐어요`);
+}
 
-  db.members.forEach(m => {
+// ===== 월별 엑셀(CSV) 저장 =====
+function exportMonthlyExcel() {
+  const month = document.getElementById('backup-month').value || statusMonth;
+  if (!month) { showToast('월을 선택하세요'); return; }
+  const [y, m] = month.split('-');
+  const monthLabel = `${y}년 ${parseInt(m)}월`;
+  const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(month));
+
+  // 헤더
+  const rows = [[`${monthLabel} 납부 현황`], []];
+  rows.push(['회원(학생)이름', '담당선생님', '마스킹패턴', '상태', '결제일시', '결제금액', '등록납부액', '메모']);
+
+  // 선생님 순서대로 정렬
+  const sorted = [...db.members].sort((a, b) => {
+    const ai = TEACHER_ORDER.indexOf(a.teacher || ''), bi = TEACHER_ORDER.indexOf(b.teacher || '');
+    if (ai === -1 && bi === -1) return (a.teacher || '').localeCompare(b.teacher || '');
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  sorted.forEach(m => {
     const mPay = monthPayments.filter(p => p.memberId === m.id);
     const candPay = monthPayments.filter(p => !p.memberId && getCandidates(p.payer).some(c => c.id === m.id));
     let status, datetime, amount;
     if (mPay.length > 0) { status = '납부'; datetime = mPay[0].datetime || ''; amount = mPay[0].amount || ''; }
     else if (candPay.length > 0) { status = '확인필요'; datetime = candPay[0].datetime || ''; amount = candPay[0].amount || ''; }
     else { status = '미납'; datetime = ''; amount = ''; }
-    rows.push([m.name, m.mask || '', m.teacher || '', status, datetime, amount, m.fee || '', m.memo || '']);
+    rows.push([m.name, m.teacher || '', m.mask || '', status, datetime, amount ? `₩${Number(amount).toLocaleString()}` : '', m.fee ? `₩${Number(m.fee).toLocaleString()}` : '', m.memo || '']);
   });
+
+  // 요약 행
+  const paid = sorted.filter(m => monthPayments.some(p => p.memberId === m.id)).length;
+  const unpaid = sorted.length - paid;
+  rows.push([]);
+  rows.push(['합계', '', '', `납부 ${paid}명 / 미납 ${unpaid}명`, '', '', '', '']);
 
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `납부현황_${statusMonth}.csv`;
+  a.download = `동백전_납부현황_${month}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('CSV 파일이 다운로드됐어요');
+  showToast(`${monthLabel} 엑셀 파일이 다운로드됐어요`);
+}
+
+// ===== CSV 내보내기 (납부현황 탭) =====
+function exportCSV() {
+  exportMonthlyExcel();
 }
 
 // ===== 토스트 =====

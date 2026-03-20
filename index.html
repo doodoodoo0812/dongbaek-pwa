@@ -33,7 +33,7 @@
         <span class="tab-icon">💳</span><span class="tab-label">내역등록</span>
       </button>
       <button class="tab-btn" onclick="switchTab('capture')" id="tab-capture">
-        <span class="tab-icon">📸</span><span class="tab-label">캡처</span>
+        <span class="tab-icon">📸</span><span class="tab-label">캡처등록</span>
       </button>
       <button class="tab-btn" onclick="switchTab('status')" id="tab-status">
         <span class="tab-icon">✅</span><span class="tab-label">현황</span>
@@ -76,7 +76,16 @@
             </div>
             <div class="form-field">
               <label>담당 선생님</label>
-              <input type="text" id="m-teacher" placeholder="홍길동 선생님">
+              <select id="m-teacher">
+                <option value="">선택하세요</option>
+                <option value="지사장님">지사장님</option>
+                <option value="최수정">최수정</option>
+                <option value="김가영">김가영</option>
+                <option value="이묘련">이묘련</option>
+                <option value="김선미">김선미</option>
+                <option value="이현주">이현주</option>
+                <option value="김보온">김보온</option>
+              </select>
             </div>
             <div class="form-field">
               <label>메모</label>
@@ -90,11 +99,11 @@
           <h3 class="card-title">엑셀로 일괄 등록</h3>
           <p class="card-desc">양식을 다운받아 작성 후 CSV로 저장해서 업로드하면 회원을 한 번에 등록할 수 있어요.</p>
           <div class="btn-row">
-            <button class="btn btn-ghost" onclick="downloadExcelTemplate()">📥 양식 다운로드</button>
+            <button class="btn btn-ghost" onclick="downloadExcelTemplate()">📥 엑셀 양식 다운로드</button>
             <button class="btn btn-ghost" onclick="document.getElementById('excel-upload').click()">📤 CSV 업로드</button>
             <input type="file" id="excel-upload" accept=".csv" style="display:none" onchange="handleExcelUpload(event)">
           </div>
-          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 엑셀에서 열고 → 다른이름으로 저장 → CSV(쉼표로 분리) 선택</p>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 후 → 파일 → 다른이름으로 저장 → CSV(쉼표로 분리) → 업로드</p>
         </div>
 
         <div class="card">
@@ -135,7 +144,16 @@
             </div>
             <div class="form-field">
               <label>금액</label>
-              <input type="number" id="p-amount" placeholder="180000">
+              <select id="p-fee-select" onchange="handlePaymentFeeSelect()">
+                <option value="">선택하세요</option>
+                <option value="180000">18만원</option>
+                <option value="200000">20만원</option>
+                <option value="custom">직접 입력</option>
+              </select>
+            </div>
+            <div class="form-field" id="p-fee-custom-wrap" style="display:none">
+              <label>금액 직접 입력 (원)</label>
+              <input type="number" id="p-amount" placeholder="예: 150000">
             </div>
           </div>
           <button class="btn btn-primary btn-full" onclick="addPayment()">➕ 내역 추가</button>
@@ -194,7 +212,33 @@
             </div>
             <div class="form-field">
               <label>금액</label>
-              <input type="number" id="r-amount">
+              <select id="r-fee-select" onchange="handleCaptureFeeSelect()">
+                <option value="">선택하세요</option>
+                <option value="180000">18만원</option>
+                <option value="200000">20만원</option>
+                <option value="custom">직접 입력</option>
+              </select>
+            </div>
+            <div class="form-field" id="r-fee-custom-wrap" style="display:none">
+              <label>금액 직접 입력 (원)</label>
+              <input type="number" id="r-amount" placeholder="예: 150000">
+            </div>
+            <div class="form-field">
+              <label>회원(학생) 이름</label>
+              <input type="text" id="r-member-name" placeholder="AI 인식 또는 직접 입력">
+            </div>
+            <div class="form-field">
+              <label>담당 선생님</label>
+              <select id="r-teacher">
+                <option value="">선택하세요</option>
+                <option value="지사장님">지사장님</option>
+                <option value="최수정">최수정</option>
+                <option value="김가영">김가영</option>
+                <option value="이묘련">이묘련</option>
+                <option value="김선미">김선미</option>
+                <option value="이현주">이현주</option>
+                <option value="김보온">김보온</option>
+              </select>
             </div>
           </div>
           <div class="btn-row">
@@ -223,8 +267,17 @@
 
         <div class="month-selector">
           <button class="month-nav" onclick="changeMonth(-1)">◀</button>
-          <span class="month-display" id="status-month-display"></span>
+          <span class="month-display" id="status-month-display" onclick="toggleMonthPicker()" style="cursor:pointer;user-select:none" title="클릭해서 월 선택"></span>
           <button class="month-nav" onclick="changeMonth(1)">▶</button>
+        </div>
+        <!-- 월 선택 달력 -->
+        <div id="month-picker" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <button class="month-nav" onclick="changePickerYear(-1)">◀</button>
+            <span id="picker-year" style="font-weight:700;font-size:16px"></span>
+            <button class="month-nav" onclick="changePickerYear(1)">▶</button>
+          </div>
+          <div id="picker-months" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px"></div>
         </div>
 
         <div class="stats-grid">
@@ -282,16 +335,23 @@
             <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>에서 무료로 발급받으세요
           </span>
         </div>
-        <div class="form-field" style="margin-top:12px">
-          <label>학원/업체명</label>
-          <input type="text" id="setting-name" placeholder="○○학원">
-        </div>
         <div class="divider"></div>
         <div class="danger-zone">
-          <h4>데이터 관리</h4>
-          <button class="btn btn-danger btn-sm" onclick="exportAllData()">📤 전체 데이터 백업</button>
-          <button class="btn btn-ghost btn-sm" onclick="importData()">📥 데이터 복원</button>
+          <h4>📦 전체 데이터 백업 / 복원</h4>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:8px">회원·결제·매칭 정보 전체를 JSON 파일로 저장해요.<br>복원하면 저장 시점으로 되돌아가요.</p>
+          <div class="btn-row" style="flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="exportAllData()">📤 전체 백업 (JSON)</button>
+            <button class="btn btn-ghost btn-sm" onclick="importData()">📥 백업 복원</button>
+          </div>
           <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
+          <div class="divider"></div>
+          <h4>📅 월별 데이터 백업</h4>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:8px">특정 월의 납부 현황을 별도로 보관할 수 있어요.</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="month" id="backup-month" style="height:34px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;background:var(--surface)">
+            <button class="btn btn-ghost btn-sm" onclick="exportMonthlyJSON()">📤 월별 JSON 백업</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportMonthlyExcel()">📊 월별 엑셀 저장</button>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
