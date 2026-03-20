@@ -445,6 +445,28 @@ html, body {
 }
 .toast.show { opacity: 1; }
 
+/* ===== 결제 등록 모드 선택 ===== */
+.input-mode-bar {
+  display: flex; gap: 6px; margin-bottom: 12px;
+}
+.input-mode-btn {
+  flex: 1; padding: 10px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text2);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+  text-align: center;
+}
+.input-mode-btn:hover { background: var(--border); }
+.input-mode-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
 /* ===== 납부 현황 - 선생님별 그룹 테이블 ===== */
 .status-teacher-group { margin-bottom: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .status-teacher-header {

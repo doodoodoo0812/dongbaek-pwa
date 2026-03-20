@@ -54,7 +54,15 @@ function switchTab(tab) {
   document.getElementById(`panel-${tab}`).classList.add('active');
   if (tab === 'status') renderStatus();
   if (tab === 'payments') renderPayments();
-  if (tab === 'capture') updateCaptureUI();
+}
+
+// ===== 입력 모드 전환 (수동/캡처) =====
+function switchInputMode(mode) {
+  document.getElementById('input-manual').style.display = mode === 'manual' ? 'block' : 'none';
+  document.getElementById('input-capture').style.display = mode === 'capture' ? 'block' : 'none';
+  document.getElementById('mode-manual').classList.toggle('active', mode === 'manual');
+  document.getElementById('mode-capture').classList.toggle('active', mode === 'capture');
+  if (mode === 'capture') updateCaptureUI();
 }
 
 // ===== 납부액 드롭다운 =====
@@ -890,7 +898,9 @@ function handleDrop(e) {
 }
 function handleFileSelect(e) { if (e.target.files[0]) loadImageFile(e.target.files[0]); }
 function handlePaste(e) {
-  if (currentTab !== 'capture') return;
+  if (currentTab !== 'payments') return;
+  const captureDiv = document.getElementById('input-capture');
+  if (!captureDiv || captureDiv.style.display === 'none') return;
   for (const item of (e.clipboardData?.items || [])) {
     if (item.type.startsWith('image/')) { loadImageFile(item.getAsFile()); break; }
   }
