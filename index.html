@@ -50,6 +50,14 @@
           <span class="count-badge" id="member-count">0명</span>
         </div>
 
+        <!-- 검색 - 맨 위 -->
+        <div class="card">
+          <div class="search-bar">
+            <input type="text" id="member-search" placeholder="이름, 선생님, 메모로 검색..." oninput="renderMembers()">
+          </div>
+          <div id="member-list" class="list-container"></div>
+        </div>
+
         <div class="card">
           <h3 class="card-title">회원 추가</h3>
           <div class="form-grid">
@@ -102,16 +110,9 @@
           <div class="btn-row">
             <button class="btn btn-ghost" onclick="downloadExcelTemplate()">📥 엑셀 양식 다운로드</button>
             <button class="btn btn-ghost" onclick="document.getElementById('excel-upload').click()">📤 작성한 CSV 업로드</button>
-            <input type="file" id="excel-upload" accept=".csv" style="display:none" onchange="handleExcelUpload(event)">
+            <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(event)">
           </div>
-          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 → 파일 → 다른이름으로 저장 → <strong>CSV(쉼표로 분리)</strong> 선택 후 위 버튼으로 업로드</p>
-        </div>
-
-        <div class="card">
-          <div class="search-bar">
-            <input type="text" id="member-search" placeholder="이름, 선생님, 메모로 검색..." oninput="renderMembers()">
-          </div>
-          <div id="member-list" class="list-container"></div>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 후 엑셀 파일(.xlsx)을 바로 업로드하세요</p>
         </div>
 
         <!-- 선생님별 리스트 -->

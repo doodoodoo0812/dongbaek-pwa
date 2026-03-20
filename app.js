@@ -108,9 +108,16 @@ function addMember() {
 }
 
 function clearMemberForm() {
-  ['m-name', 'm-mask', 'm-fee-custom', 'm-teacher', 'm-memo'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('m-fee-select').value = '';
-  document.getElementById('m-fee-custom-wrap').style.display = 'none';
+  ['m-name', 'm-mask', 'm-fee-custom', 'm-memo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const feeSelect = document.getElementById('m-fee-select');
+  if (feeSelect) feeSelect.selectedIndex = 0;
+  const teacherSelect = document.getElementById('m-teacher');
+  if (teacherSelect) teacherSelect.selectedIndex = 0;
+  const wrap = document.getElementById('m-fee-custom-wrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 function deleteMember(id) {
@@ -141,6 +148,7 @@ function renderMembers() {
 
   if (!filtered.length) {
     list.innerHTML = `<div class="list-empty">${query ? '검색 결과가 없어요' : '등록된 회원이 없어요'}</div>`;
+    renderTeacherGroups();
     return;
   }
 
@@ -293,33 +301,56 @@ function downloadExcelTemplate() {
 function handleExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
+  e.target.value = '';
+
+  const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
   const reader = new FileReader();
+
   reader.onload = (ev) => {
     try {
-      const text = ev.target.result;
-      const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
-      if (lines.length < 2) { showToast('데이터가 없어요'); return; }
+      let rows = [];
 
-      const rows = lines.slice(1); // 헤더 제외
+      if (isXlsx) {
+        // xlsx 파일 처리 (SheetJS)
+        if (!window.XLSX) { showToast('잠시 후 다시 시도해주세요 (라이브러리 로딩 중)'); return; }
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        // 헤더 행 제거 (첫 번째 행)
+        rows = jsonData.slice(1).filter(r => r.some(c => String(c).trim()));
+      } else {
+        // CSV 파일 처리
+        const text = ev.target.result;
+        const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+        if (lines.length < 2) { showToast('데이터가 없어요'); return; }
+        rows = lines.slice(1).map(line =>
+          line.split(',').map(c => c.replace(/^"|"$/g, '').trim())
+        );
+      }
+
+      if (!rows.length) { showToast('데이터가 없어요'); return; }
+
       let added = 0, skipped = 0, warnings = [];
 
-      rows.forEach(line => {
-        const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
-        // 열 순서: 이름, 담당선생님, 마스킹패턴, 월납부액, 메모
-        const [name, teacher, mask, feeStr, memo] = cols;
+      rows.forEach(cols => {
+        // 열 순서: 이름, 월납부액, 담당선생님, 마스킹패턴, 메모
+        const name   = String(cols[0] || '').trim();
+        const fee    = parseInt(cols[1]) || 0;
+        const teacher = String(cols[2] || '').trim();
+        const mask   = String(cols[3] || '').trim();
+        const memo   = String(cols[4] || '').trim();
         if (!name) return;
 
         if (db.members.find(m => m.name === name)) { skipped++; return; }
 
-        const sameMask = db.members.filter(m => m.mask === mask);
+        const sameMask = db.members.filter(m => m.mask === mask && mask);
         if (sameMask.length > 0) warnings.push(`"${name}" - 마스킹 패턴 "${mask}" 중복`);
 
         db.members.push({
           id: Date.now() + added,
-          name, mask: mask || '',
-          fee: parseInt(feeStr) || 0,
-          teacher: teacher || '',
-          memo: memo || '',
+          name, mask, fee, teacher, memo,
           createdAt: new Date().toISOString()
         });
         added++;
@@ -334,11 +365,16 @@ function handleExcelUpload(e) {
         showToast(msg);
       }
     } catch (err) {
-      showToast('파일을 읽을 수 없어요. CSV 형식인지 확인하세요');
+      console.error(err);
+      showToast('파일을 읽을 수 없어요. 엑셀 또는 CSV 파일인지 확인하세요');
     }
   };
-  reader.readAsText(file, 'UTF-8');
-  e.target.value = '';
+
+  if (isXlsx) {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file, 'UTF-8');
+  }
 }
 
 // ===== 결제 내역 금액 드롭다운 =====
@@ -427,7 +463,8 @@ function pushPayment(date, time, payer, amount) {
 function deletePayment(id) {
   showConfirm('🗑️ 내역 삭제', '이 결제 내역을 삭제할까요?', '', () => {
     db.payments = db.payments.filter(p => p.id !== id);
-    saveData(); renderPayments(); renderStatus();
+    saveData(); renderPayments();
+    if (currentTab === 'status') renderStatus();
     showToast('삭제됐어요');
   });
 }
@@ -578,7 +615,8 @@ let pickerYear = new Date().getFullYear();
 function setMonth(ym) {
   statusMonth = ym;
   const [y, m] = ym.split('-');
-  document.getElementById('status-month-display').textContent = `${y}년 ${parseInt(m)}월`;
+  const el = document.getElementById('status-month-display');
+  if (el) el.textContent = `${y}년 ${parseInt(m)}월`;
 }
 
 function changeMonth(delta) {
@@ -592,7 +630,8 @@ function changeMonth(delta) {
 // ===== 월 달력 피커 =====
 function toggleMonthPicker() {
   const picker = document.getElementById('month-picker');
-  if (picker.style.display === 'none') {
+  const isHidden = picker.style.display === 'none' || picker.style.display === '';
+  if (isHidden) {
     pickerYear = parseInt(statusMonth.split('-')[0]);
     renderMonthPicker();
     picker.style.display = 'block';
@@ -736,7 +775,7 @@ function renderStatus() {
     }).join('');
 
     return `
-      <div class="status-teacher-group open" id="${safeId}">
+      <div class="status-teacher-group" id="${safeId}">
         <div class="status-teacher-header" onclick="toggleStatusGroup('${safeId}')">
           <div class="status-teacher-name">👨‍🏫 ${teacher}</div>
           <div class="status-teacher-summary">
@@ -821,7 +860,7 @@ function renderSampleStatus() {
       }).join('');
 
       return `
-        <div class="status-teacher-group open" id="${safeId}">
+        <div class="status-teacher-group" id="${safeId}">
           <div class="status-teacher-header" onclick="toggleStatusGroup('${safeId}')">
             <div class="status-teacher-name">👨‍🏫 ${teacher}</div>
             <div class="status-teacher-summary">
@@ -909,13 +948,20 @@ async function analyzeImage() {
   warningsEl.innerHTML = '';
   document.getElementById('result-card').style.display = 'block';
 
-  const prompt = `이 이미지는 동백전(부산 지역화폐) 결제 화면 캡처입니다.
-이미지에서 결제 날짜, 결제 시간, 결제자 이름(마스킹된 형태 예: 김*수), 결제 금액을 찾아주세요.
+  const prompt = `이 이미지는 동백전(부산 지역화폐) 결제 화면 캡처이거나, 카카오톡/문자 메시지 캡처일 수 있습니다.
 
-반드시 아래 JSON 형식으로만 응답하세요. 다른 말은 하지 마세요:
-{"date":"YYYY-MM-DD","time":"HH:MM","payer":"마스킹이름","amount":숫자}
+다음 정보를 찾아서 JSON으로만 응답하세요:
 
-찾지 못한 항목은 null로 하세요.`;
+1. 결제 날짜 (YYYY-MM-DD)
+2. 결제 시간 (HH:MM)
+3. 결제자 마스킹 이름 (예: 김*수 형태)
+4. 결제 금액 (숫자만)
+5. 학생 이름 힌트: 이미지에 "OOO 어머니", "OO 엄마", "OO맘", "OO모", "OO 학부모" 같은 표현이 있으면 그 앞의 이름(OOO 또는 OO)을 student_name으로 추출하세요. 카카오톡 대화명이나 발신자 이름에서도 이런 패턴을 찾으세요.
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{"date":"YYYY-MM-DD","time":"HH:MM","payer":"마스킹이름","amount":숫자,"student_name":"학생이름또는null"}
+
+찾지 못한 항목은 null로 하세요. 다른 말은 절대 하지 마세요.`;
 
   try {
     const response = await fetch(
@@ -946,7 +992,7 @@ async function analyzeImage() {
 
     const data = await response.json();
 
-    // 응답에서 텍스트 추출 (여러 parts 대응)
+    // 응답에서 텍스트 추출
     let text = '';
     const parts = data.candidates?.[0]?.content?.parts || [];
     for (const part of parts) {
@@ -956,42 +1002,55 @@ async function analyzeImage() {
 
     if (!text) throw new Error('Gemini 응답이 비어있어요. 사진을 다시 확인해주세요.');
 
-    // JSON 파싱 — 코드블록, 앞뒤 텍스트 제거
+    // JSON 파싱
     let result = null;
-    try {
-      // 1차: 전체를 JSON으로 파싱
-      result = JSON.parse(text);
-    } catch {
-      // 2차: ```json ... ``` 블록 추출
+    try { result = JSON.parse(text); } catch {}
+    if (!result) {
       const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlock) {
-        try { result = JSON.parse(codeBlock[1].trim()); } catch {}
-      }
+      if (codeBlock) { try { result = JSON.parse(codeBlock[1].trim()); } catch {} }
     }
     if (!result) {
-      // 3차: { ... } 패턴 추출
       const jsonMatch = text.match(/\{[\s\S]*?\}/);
-      if (jsonMatch) {
-        try { result = JSON.parse(jsonMatch[0]); } catch {}
-      }
+      if (jsonMatch) { try { result = JSON.parse(jsonMatch[0]); } catch {} }
     }
-    if (!result) {
-      // 4차: 텍스트에서 직접 값 추출 시도
-      result = extractFromText(text);
-    }
-    if (!result) {
-      throw new Error(`인식 결과를 읽지 못했어요.\n원본 응답: ${text.slice(0, 100)}`);
-    }
+    if (!result) { result = extractFromText(text); }
+    if (!result) throw new Error(`인식 결과를 읽지 못했어요.\n원본 응답: ${text.slice(0, 100)}`);
 
-    // 결과 채우기
+    // ① 결제자 마스킹 이름 — 없으면 "미확인" 자동 입력
+    const payerValue = result.payer || '미확인';
+    document.getElementById('r-payer').value = payerValue;
+
+    // ② 날짜/시간/금액 채우기
     if (result.date) document.getElementById('r-date').value = result.date;
     if (result.time) document.getElementById('r-time').value = result.time;
-    if (result.payer) document.getElementById('r-payer').value = result.payer;
     if (result.amount) setCaptureFeeDropdown(result.amount);
 
-    // 마스킹 이름으로 회원 자동 매칭 시도
-    if (result.payer) {
-      const cands = getCandidates(result.payer);
+    // ③ 학생 이름 힌트 처리 (AI가 추출한 경우)
+    let detectedMember = null;
+    if (result.student_name && result.student_name !== 'null') {
+      // 회원 명단에서 이름 매칭 시도
+      const nameMatch = db.members.find(m =>
+        m.name === result.student_name ||
+        m.name.includes(result.student_name) ||
+        result.student_name.includes(m.name)
+      );
+      if (nameMatch) {
+        detectedMember = nameMatch;
+        document.getElementById('r-member-name').value = nameMatch.name;
+        const teacherSelect = document.getElementById('r-teacher');
+        const opts = Array.from(teacherSelect.options).map(o => o.value);
+        if (nameMatch.teacher && opts.includes(nameMatch.teacher)) {
+          teacherSelect.value = nameMatch.teacher;
+        }
+      } else {
+        // 회원 명단에 없어도 이름 힌트 표시
+        document.getElementById('r-member-name').value = result.student_name;
+      }
+    }
+
+    // ④ 마스킹 이름으로도 회원 자동 매칭 시도 (학생 이름 미확인 시)
+    if (!detectedMember && payerValue !== '미확인') {
+      const cands = getCandidates(payerValue);
       if (cands.length === 1) {
         document.getElementById('r-member-name').value = cands[0].name;
         const teacherSelect = document.getElementById('r-teacher');
@@ -1002,20 +1061,36 @@ async function analyzeImage() {
       }
     }
 
-    // 인식 불완전 경고
+    // ⑤ 인식 상태 및 경고 표시
     const missing = [];
     if (!result.date) missing.push('결제 날짜');
     if (!result.time) missing.push('결제 시간');
-    if (!result.payer) missing.push('결제자 이름');
+    if (!result.payer) missing.push('결제자(미확인 처리됨)');
     if (!result.amount) missing.push('금액');
 
-    if (missing.length > 0) {
+    // 학생 이름 힌트 안내
+    let studentHint = '';
+    if (result.student_name && result.student_name !== 'null') {
+      studentHint = `<div style="font-size:12px;color:var(--paid);margin-top:6px">
+        👤 "${result.student_name}" 이름이 감지됐어요${detectedMember ? ` → ${detectedMember.name} 회원으로 자동 입력` : ' (회원 명단 미등록 — 직접 확인)'}
+      </div>`;
+    }
+
+    if (missing.length > 0 && missing.some(m => !m.includes('미확인'))) {
       statusEl.className = 'ai-status error';
-      statusEl.textContent = `⚠️ 일부 정보를 인식하지 못했어요. 직접 입력해주세요.`;
-      warningsEl.innerHTML = `<div class="warning-box" style="margin-bottom:10px"><span>⚠️</span><div><strong>수동 입력 필요</strong><p>다음 항목을 직접 확인하세요: ${missing.join(', ')}</p></div></div>`;
+      statusEl.textContent = `⚠️ 일부 정보를 인식하지 못했어요.`;
+      warningsEl.innerHTML = `<div class="warning-box" style="margin-bottom:10px">
+        <span>⚠️</span>
+        <div>
+          <strong>수동 입력 필요</strong>
+          <p>확인 필요 항목: ${missing.join(', ')}</p>
+          ${!result.payer ? '<p style="color:var(--unknown);font-size:12px">결제자를 확인할 수 없어 "미확인"으로 입력됐어요.</p>' : ''}
+        </div>
+      </div>${studentHint}`;
     } else {
       statusEl.className = 'ai-status success';
-      statusEl.textContent = '✅ 인식 완료! 내용을 확인 후 저장하세요.';
+      statusEl.textContent = `✅ 인식 완료! 내용을 확인 후 저장하세요.${!result.payer ? ' (결제자 미확인)' : ''}`;
+      if (studentHint) warningsEl.innerHTML = studentHint;
     }
 
   } catch (err) {
@@ -1043,14 +1118,14 @@ function extractFromText(text) {
 function saveFromCapture() {
   const date = document.getElementById('r-date').value;
   const time = document.getElementById('r-time').value;
-  const payer = document.getElementById('r-payer').value.trim();
+  const payer = document.getElementById('r-payer').value.trim() || '미확인';
   const amount = getCaptureFeeValue();
   const memberName = document.getElementById('r-member-name').value.trim();
   const teacher = document.getElementById('r-teacher').value;
 
-  if (!date || !payer) {
-    showConfirm('⚠️ 정보 불완전', '날짜 또는 결제자 이름이 없어요.\n불완전한 정보로 저장할까요?',
-      `날짜: ${date || '(없음)'}\n결제자: ${payer || '(없음)'}\n금액: ${amount ? amount.toLocaleString() + '원' : '(없음)'}`,
+  if (!date) {
+    showConfirm('⚠️ 날짜 없음', '결제 날짜가 없어요.\n날짜 없이 저장할까요?',
+      `결제자: ${payer}\n금액: ${amount ? amount.toLocaleString() + '원' : '(없음)'}`,
       () => doSaveCapture(date, time, payer, amount, memberName, teacher));
     return;
   }
@@ -1207,17 +1282,18 @@ function exportMonthlyJSON() {
   showToast(`${month} 월별 백업이 완료됐어요`);
 }
 
-// ===== 월별 엑셀 저장 (SheetJS) =====
+// ===== 월별 엑셀 저장 (SheetJS - 직접 셀 구성) =====
 function exportMonthlyExcel() {
   const month = (document.getElementById('backup-month') && document.getElementById('backup-month').value)
     || statusMonth;
   if (!month) { showToast('월을 선택하세요'); return; }
+  if (!window.XLSX) { showToast('잠시 후 다시 시도해주세요 (라이브러리 로딩 중)'); return; }
 
   const [y, m] = month.split('-');
   const monthLabel = `${y}년 ${parseInt(m)}월`;
   const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(month));
 
-  // 선생님 순서대로 정렬
+  // 선생님 순서대로 회원 정렬
   const sorted = [...db.members].sort((a, b) => {
     const ai = TEACHER_ORDER.indexOf(a.teacher || ''), bi = TEACHER_ORDER.indexOf(b.teacher || '');
     if (ai === -1 && bi === -1) return (a.teacher || '').localeCompare(b.teacher || '');
@@ -1225,44 +1301,94 @@ function exportMonthlyExcel() {
     return ai - bi;
   });
 
-  // 데이터 rows 구성
-  const dataRows = sorted.map(m => {
-    const mPay = monthPayments.filter(p => p.memberId === m.id);
-    const candPay = monthPayments.filter(p => !p.memberId && getCandidates(p.payer).some(c => c.id === m.id));
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  let row = 1;
+
+  // 셀 스타일 헬퍼
+  const cell = (v, t = 's') => ({ v, t });
+
+  // ── 제목 행 ──
+  ws[`A${row}`] = cell(`동백전 납부 현황 — ${monthLabel}`);
+  ws[`A${row}`].s = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center' } };
+  ws['!merges'] = ws['!merges'] || [];
+  ws['!merges'].push({ s: { r: row-1, c: 0 }, e: { r: row-1, c: 7 } });
+  row++;
+  row++; // 빈 줄
+
+  // ── 컬럼 헤더 ──
+  const headers = ['번호', '회원(학생) 이름', '담당 선생님', '마스킹 패턴', '상태', '결제일시', '결제금액', '등록납부액', '메모'];
+  headers.forEach((h, i) => {
+    const col = String.fromCharCode(65 + i);
+    ws[`${col}${row}`] = cell(h);
+  });
+  row++;
+
+  // ── 데이터 행 ──
+  let totalPaid = 0, totalUnpaid = 0, totalUnknown = 0;
+  let no = 1;
+
+  sorted.forEach(member => {
+    const mPay = monthPayments.filter(p => p.memberId === member.id);
+    const candPay = monthPayments.filter(p => !p.memberId && getCandidates(p.payer).some(c => c.id === member.id));
     let status, datetime, amount;
-    if (mPay.length > 0) { status = '납부'; datetime = mPay[0].datetime || ''; amount = mPay[0].amount || 0; }
-    else if (candPay.length > 0) { status = '확인필요'; datetime = candPay[0].datetime || ''; amount = candPay[0].amount || 0; }
-    else { status = '미납'; datetime = ''; amount = ''; }
-    return {
-      '회원(학생)이름': m.name,
-      '담당선생님': m.teacher || '',
-      '마스킹패턴': m.mask || '',
-      '상태': status,
-      '결제일시': datetime,
-      '결제금액': amount || '',
-      '등록납부액': m.fee || '',
-      '메모': m.memo || ''
-    };
+
+    if (mPay.length > 0) {
+      status = '✅ 납부';
+      datetime = mPay[0].datetime || '';
+      amount = mPay[0].amount || '';
+      totalPaid++;
+    } else if (candPay.length > 0) {
+      status = '⚠️ 확인필요';
+      datetime = candPay[0].datetime || '';
+      amount = candPay[0].amount || '';
+      totalUnknown++;
+    } else {
+      status = '❌ 미납';
+      datetime = '';
+      amount = '';
+      totalUnpaid++;
+    }
+
+    ws[`A${row}`] = cell(no, 'n');
+    ws[`B${row}`] = cell(member.name);
+    ws[`C${row}`] = cell(member.teacher || '');
+    ws[`D${row}`] = cell(member.mask || '');
+    ws[`E${row}`] = cell(status);
+    ws[`F${row}`] = cell(datetime);
+    ws[`G${row}`] = amount !== '' ? cell(Number(amount), 'n') : cell('');
+    ws[`H${row}`] = member.fee ? cell(Number(member.fee), 'n') : cell('');
+    ws[`I${row}`] = cell(member.memo || '');
+    row++;
+    no++;
   });
 
-  // 요약 row
-  const paid = sorted.filter(m => monthPayments.some(p => p.memberId === m.id)).length;
-  const unpaid = sorted.length - paid;
-  dataRows.push({});
-  dataRows.push({ '회원(학생)이름': `납부 ${paid}명 / 미납 ${unpaid}명 / 전체 ${sorted.length}명` });
+  row++; // 빈 줄
 
-  if (!window.XLSX) { showToast('잠시 후 다시 시도해주세요 (라이브러리 로딩 중)'); return; }
+  // ── 요약 행 ──
+  ws[`A${row}`] = cell('합계');
+  ws[`B${row}`] = cell(`전체 ${sorted.length}명`);
+  ws[`C${row}`] = cell(`✅ 납부 ${totalPaid}명`);
+  ws[`D${row}`] = cell(`❌ 미납 ${totalUnpaid}명`);
+  ws[`E${row}`] = cell(`⚠️ 확인필요 ${totalUnknown}명`);
 
-  const ws = XLSX.utils.json_to_sheet(dataRows);
-
-  // 열 너비 설정
+  // ── 열 너비 설정 ──
   ws['!cols'] = [
-    { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
-    { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }
+    { wch: 6 },  // 번호
+    { wch: 14 }, // 이름
+    { wch: 12 }, // 선생님
+    { wch: 12 }, // 마스킹
+    { wch: 12 }, // 상태
+    { wch: 20 }, // 결제일시
+    { wch: 12 }, // 결제금액
+    { wch: 12 }, // 등록납부액
+    { wch: 16 }, // 메모
   ];
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, `${y}년${parseInt(m)}월 납부현황`);
+  // ── 범위 설정 ──
+  ws['!ref'] = `A1:I${row}`;
+
+  XLSX.utils.book_append_sheet(wb, ws, `${y}년${parseInt(m)}월`);
   XLSX.writeFile(wb, `동백전_납부현황_${month}.xlsx`);
   showToast(`${monthLabel} 엑셀 파일이 다운로드됐어요`);
 }
