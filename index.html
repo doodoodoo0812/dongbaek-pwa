@@ -12,6 +12,7 @@
   <title>동백전 납부 매칭</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -100,10 +101,10 @@
           <p class="card-desc">양식을 다운받아 작성 후 CSV로 저장해서 업로드하면 회원을 한 번에 등록할 수 있어요.</p>
           <div class="btn-row">
             <button class="btn btn-ghost" onclick="downloadExcelTemplate()">📥 엑셀 양식 다운로드</button>
-            <button class="btn btn-ghost" onclick="document.getElementById('excel-upload').click()">📤 CSV 업로드</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('excel-upload').click()">📤 작성한 CSV 업로드</button>
             <input type="file" id="excel-upload" accept=".csv" style="display:none" onchange="handleExcelUpload(event)">
           </div>
-          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 후 → 파일 → 다른이름으로 저장 → CSV(쉼표로 분리) → 업로드</p>
+          <p style="font-size:11px;color:var(--text3);margin-top:8px">※ 양식 작성 → 파일 → 다른이름으로 저장 → <strong>CSV(쉼표로 분리)</strong> 선택 후 위 버튼으로 업로드</p>
         </div>
 
         <div class="card">
@@ -301,7 +302,7 @@
 
         <div class="action-bar">
           <button class="btn btn-primary" onclick="runAutoMatch()">🔗 자동 매칭 실행</button>
-          <button class="btn btn-ghost" onclick="exportCSV()">📥 CSV 내보내기</button>
+          <button class="btn btn-ghost" onclick="exportMonthlyExcel()">📊 엑셀 내보내기</button>
         </div>
 
         <div class="filter-bar">
@@ -350,7 +351,7 @@
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input type="month" id="backup-month" style="height:34px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;background:var(--surface)">
             <button class="btn btn-ghost btn-sm" onclick="exportMonthlyJSON()">📤 월별 JSON 백업</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportMonthlyExcel()">📊 월별 엑셀 저장</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportMonthlyExcel()">📊 월별 엑셀 저장 (.xlsx)</button>
           </div>
         </div>
       </div>

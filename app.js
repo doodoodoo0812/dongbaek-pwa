@@ -236,16 +236,41 @@ function toggleTeacherGroup(id) {
 
 function getSampleMembers() {
   return [
-    { id: -1,  name: '김민준', mask: '김*준', fee: 180000, teacher: '지사장님', memo: '초등4학년' },
-    { id: -2,  name: '이서연', mask: '이*연', fee: 200000, teacher: '지사장님', memo: '중등1학년' },
-    { id: -3,  name: '최지우', mask: '최*우', fee: 180000, teacher: '최수정',  memo: '초등6학년' },
-    { id: -4,  name: '정예린', mask: '정*린', fee: 200000, teacher: '최수정',  memo: '고등1학년' },
-    { id: -5,  name: '한도윤', mask: '한*윤', fee: 180000, teacher: '김가영',  memo: '중등3학년' },
-    { id: -6,  name: '오승현', mask: '오*현', fee: 200000, teacher: '이묘련',  memo: '고등2학년' },
-    { id: -7,  name: '윤하은', mask: '윤*은', fee: 180000, teacher: '김선미',  memo: '초등5학년' },
-    { id: -8,  name: '임준호', mask: '임*호', fee: 180000, teacher: '이현주',  memo: '초등3학년' },
-    { id: -9,  name: '강수아', mask: '강*아', fee: 200000, teacher: '김보온',  memo: '중등2학년' },
-    { id: -10, name: '박재현', mask: '박*현', fee: 180000, teacher: '',        memo: '고등3학년' },
+    // 지사장님 - 4명
+    { id:-1,  name:'김민준', mask:'김*준', fee:180000, teacher:'지사장님', memo:'초등4학년' },
+    { id:-2,  name:'이서연', mask:'이*연', fee:200000, teacher:'지사장님', memo:'중등1학년' },
+    { id:-3,  name:'박도현', mask:'박*현', fee:180000, teacher:'지사장님', memo:'초등6학년' },
+    { id:-4,  name:'최아름', mask:'최*름', fee:200000, teacher:'지사장님', memo:'고등1학년' },
+    // 최수정 - 3명
+    { id:-5,  name:'정예린', mask:'정*린', fee:200000, teacher:'최수정', memo:'고등2학년' },
+    { id:-6,  name:'한도윤', mask:'한*윤', fee:180000, teacher:'최수정', memo:'중등3학년' },
+    { id:-7,  name:'오지훈', mask:'오*훈', fee:180000, teacher:'최수정', memo:'초등5학년' },
+    // 김가영 - 4명
+    { id:-8,  name:'윤하은', mask:'윤*은', fee:180000, teacher:'김가영', memo:'초등3학년' },
+    { id:-9,  name:'임준호', mask:'임*호', fee:200000, teacher:'김가영', memo:'중등2학년' },
+    { id:-10, name:'강수아', mask:'강*아', fee:180000, teacher:'김가영', memo:'초등5학년' },
+    { id:-11, name:'조현우', mask:'조*우', fee:200000, teacher:'김가영', memo:'고등1학년' },
+    // 이묘련 - 3명
+    { id:-12, name:'신지민', mask:'신*민', fee:180000, teacher:'이묘련', memo:'중등1학년' },
+    { id:-13, name:'황서준', mask:'황*준', fee:200000, teacher:'이묘련', memo:'고등3학년' },
+    { id:-14, name:'류나연', mask:'류*연', fee:180000, teacher:'이묘련', memo:'초등6학년' },
+    // 김선미 - 4명
+    { id:-15, name:'백승현', mask:'백*현', fee:200000, teacher:'김선미', memo:'고등2학년' },
+    { id:-16, name:'전미래', mask:'전*래', fee:180000, teacher:'김선미', memo:'중등3학년' },
+    { id:-17, name:'남주혁', mask:'남*혁', fee:180000, teacher:'김선미', memo:'초등4학년' },
+    { id:-18, name:'문하린', mask:'문*린', fee:200000, teacher:'김선미', memo:'중등2학년' },
+    // 이현주 - 3명
+    { id:-19, name:'서태양', mask:'서*양', fee:180000, teacher:'이현주', memo:'초등3학년' },
+    { id:-20, name:'노은별', mask:'노*별', fee:200000, teacher:'이현주', memo:'고등1학년' },
+    { id:-21, name:'고준서', mask:'고*서', fee:180000, teacher:'이현주', memo:'중등1학년' },
+    // 김보온 - 4명
+    { id:-22, name:'방채원', mask:'방*원', fee:200000, teacher:'김보온', memo:'고등2학년' },
+    { id:-23, name:'탁지우', mask:'탁*우', fee:180000, teacher:'김보온', memo:'초등6학년' },
+    { id:-24, name:'편수진', mask:'편*진', fee:180000, teacher:'김보온', memo:'중등2학년' },
+    { id:-25, name:'마준혁', mask:'마*혁', fee:200000, teacher:'김보온', memo:'고등3학년' },
+    // 담당 미지정 - 2명
+    { id:-26, name:'박재현', mask:'박*현', fee:180000, teacher:'', memo:'초등5학년' },
+    { id:-27, name:'김소희', mask:'김*희', fee:200000, teacher:'', memo:'중등1학년' },
   ];
 }
 
@@ -825,7 +850,7 @@ async function analyzeImage() {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${db.settings.apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${db.settings.apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -963,7 +988,8 @@ function closeMatchModalOutside(e) { if (e.target === document.getElementById('m
 // ===== 설정 =====
 function openSettings() {
   document.getElementById('api-key-input').value = db.settings.apiKey || '';
-  document.getElementById('setting-name').value = db.settings.orgName || '';
+  const backupMonth = document.getElementById('backup-month');
+  if (backupMonth) backupMonth.value = statusMonth;
   document.getElementById('settings-modal').style.display = 'flex';
 }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
@@ -1061,17 +1087,15 @@ function exportMonthlyJSON() {
   showToast(`${month} 월별 백업이 완료됐어요`);
 }
 
-// ===== 월별 엑셀(CSV) 저장 =====
+// ===== 월별 엑셀 저장 (SheetJS) =====
 function exportMonthlyExcel() {
-  const month = document.getElementById('backup-month').value || statusMonth;
+  const month = (document.getElementById('backup-month') && document.getElementById('backup-month').value)
+    || statusMonth;
   if (!month) { showToast('월을 선택하세요'); return; }
+
   const [y, m] = month.split('-');
   const monthLabel = `${y}년 ${parseInt(m)}월`;
   const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(month));
-
-  // 헤더
-  const rows = [[`${monthLabel} 납부 현황`], []];
-  rows.push(['회원(학생)이름', '담당선생님', '마스킹패턴', '상태', '결제일시', '결제금액', '등록납부액', '메모']);
 
   // 선생님 순서대로 정렬
   const sorted = [...db.members].sort((a, b) => {
@@ -1081,34 +1105,49 @@ function exportMonthlyExcel() {
     return ai - bi;
   });
 
-  sorted.forEach(m => {
+  // 데이터 rows 구성
+  const dataRows = sorted.map(m => {
     const mPay = monthPayments.filter(p => p.memberId === m.id);
     const candPay = monthPayments.filter(p => !p.memberId && getCandidates(p.payer).some(c => c.id === m.id));
     let status, datetime, amount;
-    if (mPay.length > 0) { status = '납부'; datetime = mPay[0].datetime || ''; amount = mPay[0].amount || ''; }
-    else if (candPay.length > 0) { status = '확인필요'; datetime = candPay[0].datetime || ''; amount = candPay[0].amount || ''; }
+    if (mPay.length > 0) { status = '납부'; datetime = mPay[0].datetime || ''; amount = mPay[0].amount || 0; }
+    else if (candPay.length > 0) { status = '확인필요'; datetime = candPay[0].datetime || ''; amount = candPay[0].amount || 0; }
     else { status = '미납'; datetime = ''; amount = ''; }
-    rows.push([m.name, m.teacher || '', m.mask || '', status, datetime, amount ? `₩${Number(amount).toLocaleString()}` : '', m.fee ? `₩${Number(m.fee).toLocaleString()}` : '', m.memo || '']);
+    return {
+      '회원(학생)이름': m.name,
+      '담당선생님': m.teacher || '',
+      '마스킹패턴': m.mask || '',
+      '상태': status,
+      '결제일시': datetime,
+      '결제금액': amount || '',
+      '등록납부액': m.fee || '',
+      '메모': m.memo || ''
+    };
   });
 
-  // 요약 행
+  // 요약 row
   const paid = sorted.filter(m => monthPayments.some(p => p.memberId === m.id)).length;
   const unpaid = sorted.length - paid;
-  rows.push([]);
-  rows.push(['합계', '', '', `납부 ${paid}명 / 미납 ${unpaid}명`, '', '', '', '']);
+  dataRows.push({});
+  dataRows.push({ '회원(학생)이름': `납부 ${paid}명 / 미납 ${unpaid}명 / 전체 ${sorted.length}명` });
 
-  const csv = '\uFEFF' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `동백전_납부현황_${month}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  if (!window.XLSX) { showToast('잠시 후 다시 시도해주세요 (라이브러리 로딩 중)'); return; }
+
+  const ws = XLSX.utils.json_to_sheet(dataRows);
+
+  // 열 너비 설정
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+    { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `${y}년${parseInt(m)}월 납부현황`);
+  XLSX.writeFile(wb, `동백전_납부현황_${month}.xlsx`);
   showToast(`${monthLabel} 엑셀 파일이 다운로드됐어요`);
 }
 
-// ===== CSV 내보내기 (납부현황 탭) =====
+// ===== CSV 내보내기 → 엑셀로 대체 =====
 function exportCSV() {
   exportMonthlyExcel();
 }
