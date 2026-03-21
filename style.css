@@ -341,51 +341,6 @@ html, body {
 
 .action-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
-.filter-bar {
-  display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto;
-  padding-bottom: 4px;
-}
-.filter-btn {
-  flex-shrink: 0; padding: 6px 14px;
-  border: 1px solid var(--border); border-radius: 20px;
-  background: none; cursor: pointer; font-size: 13px;
-  font-family: 'Noto Sans KR', sans-serif;
-  transition: all 0.15s; color: var(--text2);
-}
-.filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-
-.status-item {
-  padding: 14px;
-  background: var(--surface);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
-}
-.status-item.paid { border-left-color: var(--paid); }
-.status-item.unpaid { border-left-color: var(--unpaid); }
-.status-item.unknown { border-left-color: var(--unknown); }
-
-.status-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.status-name { font-size: 15px; font-weight: 700; }
-.status-badge {
-  font-size: 11px; font-weight: 700; padding: 3px 10px;
-  border-radius: 20px;
-}
-.badge-paid { background: var(--paid-bg); color: var(--paid); }
-.badge-unpaid { background: var(--unpaid-bg); color: var(--unpaid); }
-.badge-unknown { background: var(--unknown-bg); color: var(--unknown); }
-
-.status-detail { font-size: 12px; color: var(--text2); }
-.status-candidates { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-.candidate-tag {
-  background: var(--primary-light); color: var(--primary);
-  border: 1px solid var(--primary);
-  font-size: 12px; padding: 3px 10px; border-radius: 20px;
-  cursor: pointer; transition: all 0.15s;
-  font-family: 'JetBrains Mono', monospace;
-}
-.candidate-tag:hover { background: var(--primary); color: white; }
-
 /* ===== Modal ===== */
 .modal-overlay {
   position: fixed; inset: 0;

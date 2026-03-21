@@ -280,14 +280,41 @@
         <!-- ── 일괄 입력 ── -->
         <div id="input-bulk" style="display:none">
           <div class="card">
-            <h3 class="card-title">결제 내역 일괄 입력</h3>
-            <p class="card-desc">동백전 앱에서 결제 내역을 복사해서 아래에 붙여넣으세요.<br>한 줄에 하나씩, 날짜·결제자·금액이 포함된 텍스트를 인식해요.</p>
+            <h3 class="card-title">사진 또는 텍스트로 일괄 등록</h3>
+            <p class="card-desc">동백전 결제 캡처 사진을 올리거나, 텍스트를 붙여넣어 여러 건을 한꺼번에 등록하세요.</p>
+
+            <!-- 사진 업로드 영역 -->
+            <div class="upload-zone" id="bulk-upload-zone"
+                 ondrop="handleBulkDrop(event)"
+                 ondragover="handleBulkDragOver(event)"
+                 ondragleave="handleBulkDragLeave(event)"
+                 onclick="document.getElementById('bulk-file-input').click()">
+              <div class="upload-icon">📷</div>
+              <div class="upload-text">사진 클릭 또는 드래그</div>
+              <div class="upload-sub">Ctrl+V 붙여넣기도 가능 · 여러 장 선택 가능</div>
+              <input type="file" id="bulk-file-input" accept="image/*" multiple style="display:none" onchange="handleBulkFileSelect(event)">
+            </div>
+
+            <!-- 사진 미리보기 목록 -->
+            <div id="bulk-preview-list" style="display:none;margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+
+            <!-- AI 인식 진행 상태 -->
+            <div id="bulk-ai-status" style="display:none;margin-top:10px"></div>
+
+            <!-- 구분선 -->
+            <div style="display:flex;align-items:center;gap:10px;margin:14px 0">
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+              <span style="font-size:12px;color:var(--text3)">또는 텍스트로 직접 입력</span>
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
+
+            <!-- 텍스트 일괄 입력 -->
             <textarea id="bulk-input" placeholder="예시:
 2025-03-05 14:22 김*수 180,000원
 2025-03-06 이*연 200000
-03/07 박*현 18만원" style="width:100%;height:140px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;resize:vertical;background:var(--surface);color:var(--text)"></textarea>
+03/07 박*현 18만원" style="width:100%;height:110px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;resize:vertical;background:var(--surface);color:var(--text)"></textarea>
             <div class="btn-row" style="margin-top:10px">
-              <button class="btn btn-primary" onclick="parseBulkInput()">📥 분석 및 추가</button>
+              <button class="btn btn-primary" onclick="parseBulkInput()">📥 텍스트 분석 추가</button>
               <button class="btn btn-ghost" onclick="document.getElementById('bulk-input').value=''">초기화</button>
             </div>
             <div id="bulk-result" style="display:none;margin-top:10px"></div>

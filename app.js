@@ -5,7 +5,7 @@
 let db = {
   members: [],
   payments: [],
-  settings: { apiKey: '', orgName: '' }
+  settings: { apiKey: '' }
 };
 
 let currentTab = 'members';
@@ -31,6 +31,15 @@ function init() {
   document.getElementById('p-date').value = today;
   document.getElementById('p-time').value = now;
   document.getElementById('payment-month').value = statusMonth;
+
+  // 회원 추가 폼 기본 열림
+  const addForm = document.getElementById('member-add-form');
+  const addBtn = document.getElementById('add-toggle-btn');
+  if (addForm) addForm.style.display = 'block';
+  if (addBtn) addBtn.classList.add('active');
+
+  // 초기 미납 뱃지
+  updateUnpaidBadge();
 }
 
 function saveData() {
@@ -53,6 +62,8 @@ function switchTab(tab) {
   document.getElementById(`panel-${tab}`).classList.add('active');
   if (tab === 'status') renderStatus();
   if (tab === 'payments') renderPayments();
+  // 어느 탭이든 뱃지는 항상 최신 상태 유지
+  updateUnpaidBadge();
 }
 
 // ===== 입력 모드 전환 (수동/캡처/일괄) =====
@@ -262,7 +273,7 @@ function renderTeacherGroups() {
       const students = groups[teacher];
       const safeId = 'tg-' + teacher.replace(/[\s()]/g, '-');
       return `
-        <div class="teacher-group open" id="${safeId}">
+        <div class="teacher-group" id="${safeId}">
           <div class="teacher-group-header" onclick="toggleTeacherGroup('${safeId}')">
             <div class="teacher-group-title">
               <span>👨‍🏫</span><span>${teacher}</span>
@@ -954,6 +965,20 @@ function handleDrop(e) {
 function handleFileSelect(e) { if (e.target.files[0]) loadImageFile(e.target.files[0]); }
 function handlePaste(e) {
   if (currentTab !== 'payments') return;
+
+  // 일괄 입력 모드: 사진 붙여넣기
+  const bulkDiv = document.getElementById('input-bulk');
+  if (bulkDiv && bulkDiv.style.display !== 'none') {
+    for (const item of (e.clipboardData?.items || [])) {
+      if (item.type.startsWith('image/')) {
+        loadBulkFiles([item.getAsFile()]);
+        return;
+      }
+    }
+    return;
+  }
+
+  // 캡처 모드: 기존 방식
   const captureDiv = document.getElementById('input-capture');
   if (!captureDiv || captureDiv.style.display === 'none') return;
   for (const item of (e.clipboardData?.items || [])) {
@@ -1331,7 +1356,198 @@ function handleImport(e) {
   reader.readAsText(file);
 }
 
-// ===== ① 미납 뱃지 업데이트 =====
+// ===== 일괄 입력 - 사진 처리 =====
+let bulkImages = []; // { base64, fileName, result }
+
+function handleBulkDragOver(e) {
+  e.preventDefault();
+  document.getElementById('bulk-upload-zone').classList.add('drag-over');
+}
+function handleBulkDragLeave() {
+  document.getElementById('bulk-upload-zone').classList.remove('drag-over');
+}
+function handleBulkDrop(e) {
+  e.preventDefault();
+  document.getElementById('bulk-upload-zone').classList.remove('drag-over');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) loadBulkFiles(files);
+  else showToast('이미지 파일만 올려주세요');
+}
+function handleBulkFileSelect(e) {
+  const files = [...e.target.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) loadBulkFiles(files);
+  e.target.value = '';
+}
+
+function loadBulkFiles(files) {
+  const zone = document.getElementById('bulk-upload-zone');
+  zone.querySelector('.upload-text').textContent = `${files.length}장 로드 중...`;
+
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(',')[1];
+      bulkImages.push({ base64, fileName: file.name, result: null });
+      loaded++;
+      if (loaded === files.length) {
+        renderBulkPreviews();
+        if (db.settings.apiKey) {
+          analyzeBulkImages();
+        } else {
+          document.getElementById('bulk-ai-status').style.display = 'block';
+          document.getElementById('bulk-ai-status').innerHTML =
+            `<div class="warning-box"><span>⚠️</span><div><strong>API 키 없음</strong><p>설정에서 Gemini API 키를 입력하면 자동 인식이 가능해요.</p><button class="btn btn-primary btn-sm" onclick="openSettings()">⚙️ 설정</button></div></div>`;
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderBulkPreviews() {
+  const list = document.getElementById('bulk-preview-list');
+  list.style.display = 'flex';
+  list.innerHTML = bulkImages.map((img, i) => `
+    <div id="bulk-thumb-${i}" style="position:relative;width:80px">
+      <img src="data:image/jpeg;base64,${img.base64}"
+        style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border);display:block">
+      <div id="bulk-thumb-status-${i}" style="position:absolute;bottom:2px;left:2px;right:2px;text-align:center;font-size:10px;background:rgba(0,0,0,0.55);color:white;border-radius:3px;padding:1px 2px">
+        대기중
+      </div>
+      <button onclick="removeBulkImage(${i})"
+        style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--unpaid);color:white;border:none;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeBulkImage(index) {
+  bulkImages.splice(index, 1);
+  if (bulkImages.length === 0) {
+    document.getElementById('bulk-preview-list').style.display = 'none';
+    document.getElementById('bulk-ai-status').style.display = 'none';
+    const zone = document.getElementById('bulk-upload-zone');
+    zone.querySelector('.upload-text').textContent = '사진 클릭 또는 드래그';
+  } else {
+    renderBulkPreviews();
+  }
+}
+
+async function analyzeBulkImages() {
+  if (!db.settings.apiKey) { openSettings(); return; }
+
+  const statusEl = document.getElementById('bulk-ai-status');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = `<div class="ai-status loading">🔍 ${bulkImages.length}장 분석 중...</div>`;
+
+  const prompt = `이 이미지는 동백전(부산 지역화폐) 결제 화면 캡처이거나 카카오톡 메시지 캡처입니다.
+다음 정보를 JSON으로만 응답하세요:
+{"date":"YYYY-MM-DD","time":"HH:MM","payer":"김*수 형태","amount":숫자,"student_name":"학생이름또는null"}
+찾지 못한 항목은 null. 다른 말은 하지 마세요.`;
+
+  let successCount = 0;
+  const results = [];
+
+  for (let i = 0; i < bulkImages.length; i++) {
+    const thumbStatus = document.getElementById(`bulk-thumb-status-${i}`);
+    if (thumbStatus) thumbStatus.textContent = '분석중...';
+
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${db.settings.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { text: prompt },
+              { inline_data: { mime_type: 'image/jpeg', data: bulkImages[i].base64 } }
+            ]}],
+            generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' }
+          })
+        }
+      );
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      let text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+
+      let result = null;
+      try { result = JSON.parse(text); } catch {}
+      if (!result) {
+        const m = text.match(/\{[\s\S]*?\}/);
+        if (m) try { result = JSON.parse(m[0]); } catch {}
+      }
+
+      if (result) {
+        bulkImages[i].result = result;
+        successCount++;
+        if (thumbStatus) {
+          thumbStatus.textContent = '✅';
+          thumbStatus.style.background = 'rgba(45,140,95,0.8)';
+        }
+        // 즉시 결제 내역에 추가
+        const date = result.date || '';
+        const time = result.time || '';
+        const payer = result.payer || '미확인';
+        const amount = result.amount || 0;
+        const datetime = date ? `${date}${time ? ' ' + time : ''}` : '';
+
+        // 학생 이름으로 회원 매칭 시도
+        let memberId = null;
+        if (result.student_name && result.student_name !== 'null') {
+          const found = db.members.find(m =>
+            m.name === result.student_name || m.name.includes(result.student_name)
+          );
+          if (found) memberId = found.id;
+        }
+        if (!memberId && payer !== '미확인') {
+          const cands = getCandidates(payer);
+          if (cands.length === 1) memberId = cands[0].id;
+        }
+
+        db.payments.push({
+          id: Date.now() + i,
+          datetime, date, time, payer, amount, memberId,
+          createdAt: new Date().toISOString()
+        });
+        results.push({ success: true, payer, date, amount });
+      } else {
+        if (thumbStatus) {
+          thumbStatus.textContent = '❌';
+          thumbStatus.style.background = 'rgba(194,72,72,0.8)';
+        }
+        results.push({ success: false });
+      }
+    } catch (err) {
+      if (thumbStatus) {
+        thumbStatus.textContent = '❌';
+        thumbStatus.style.background = 'rgba(194,72,72,0.8)';
+      }
+      results.push({ success: false, error: err.message });
+    }
+
+    // 각 이미지 사이 짧은 딜레이 (API rate limit 방지)
+    if (i < bulkImages.length - 1) await new Promise(r => setTimeout(r, 500));
+  }
+
+  saveData(); renderPayments(); updateUnpaidBadge();
+
+  statusEl.innerHTML = `
+    <div class="ai-status ${successCount > 0 ? 'success' : 'error'}">
+      ${successCount > 0 ? '✅' : '❌'} ${bulkImages.length}장 중 <strong>${successCount}장</strong> 인식 성공 → 결제 내역에 추가됐어요
+      ${successCount < bulkImages.length ? `<br><span style="font-size:12px;color:var(--text2)">${bulkImages.length - successCount}장은 인식 실패 — 수동으로 추가해주세요</span>` : ''}
+    </div>`;
+
+  // 완료 후 초기화
+  setTimeout(() => {
+    bulkImages = [];
+    document.getElementById('bulk-preview-list').style.display = 'none';
+    document.getElementById('bulk-upload-zone').querySelector('.upload-text').textContent = '사진 클릭 또는 드래그';
+  }, 3000);
+}
+
+
 function updateUnpaidBadge() {
   const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(statusMonth));
   const unpaidCount = db.members.filter(m =>
@@ -1624,11 +1840,6 @@ function exportMonthlyExcel() {
   XLSX.utils.book_append_sheet(wb, ws, `${y}년${parseInt(m)}월`);
   XLSX.writeFile(wb, `동백전_납부현황_${month}.xlsx`);
   showToast(`${monthLabel} 엑셀 파일이 다운로드됐어요`);
-}
-
-// ===== CSV 내보내기 → 엑셀로 대체 =====
-function exportCSV() {
-  exportMonthlyExcel();
 }
 
 // ===== 토스트 =====
