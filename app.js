@@ -190,8 +190,19 @@ function toggleMemberAddForm() {
 function renderMembers() {
   const query = (document.getElementById('member-search')?.value || '').trim().toLowerCase();
 
-  // 카운트는 항상 전체 회원 수로 표시
-  document.getElementById('member-count').textContent = `${db.members.length}명`;
+  // 카운트: 실제 회원이 있으면 실제 수, 샘플이면 샘플 수 + 표시
+  const isSample = db.members.length === 0;
+  const countEl = document.getElementById('member-count');
+  if (isSample) {
+    const sampleCount = getSampleMembers().length;
+    countEl.textContent = `${sampleCount}명 (샘플)`;
+    countEl.style.background = 'var(--unknown-bg)';
+    countEl.style.color = 'var(--unknown)';
+  } else {
+    countEl.textContent = `${db.members.length}명`;
+    countEl.style.background = '';
+    countEl.style.color = '';
+  }
 
   const resultsDiv = document.getElementById('member-search-results');
   const list = document.getElementById('member-list');
