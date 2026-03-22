@@ -102,6 +102,8 @@ html, body {
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-height: 0; /* flex child 스크롤 핵심 */
+  height: 0; /* 모바일 flex 스크롤 강제 */
 }
 
 .panel {
@@ -110,9 +112,11 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px;
-  padding-bottom: 40px;
+  padding-bottom: 48px;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  /* iOS 사파리 탄성 스크롤 */
+  scroll-behavior: smooth;
 }
 .panel.active { display: block; }
 
@@ -520,6 +524,28 @@ html, body {
 /* 601px 규칙 → 768px 반응형으로 통합 */
 
 
+
+/* ===== 다크 모드 ===== */
+[data-theme="dark"] {
+  --primary: #f07090;
+  --primary-dark: #d45070;
+  --primary-light: #3d1a24;
+  --bg: #111214;
+  --surface: #1a1c1f;
+  --surface2: #22252a;
+  --border: #2e3138;
+  --text: #e8eaed;
+  --text2: #9aa0ac;
+  --text3: #5f6672;
+  --paid: #4caf82;
+  --paid-bg: #0d2b1e;
+  --unpaid: #e06060;
+  --unpaid-bg: #2b0d0d;
+  --unknown: #e0a040;
+  --unknown-bg: #2b1e08;
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
 /* ===== 스크롤바 ===== */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -648,3 +674,23 @@ html, body {
   .status-row { grid-template-columns: 1fr 120px 140px 120px; padding: 11px 22px; }
   .status-col-header { grid-template-columns: 1fr 120px 140px 120px; padding: 9px 22px; }
 }
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] .card { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .tab-nav { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .header { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .modal { background: var(--surface); }
+[data-theme="dark"] .upload-zone { background: var(--surface2); border-color: var(--border); }
+[data-theme="dark"] .teacher-group-header { background: var(--surface2); }
+[data-theme="dark"] .teacher-student-item { background: var(--surface2); }
+[data-theme="dark"] .status-teacher-header { background: var(--surface2); }
+[data-theme="dark"] .payment-item { background: var(--surface2); border-color: var(--border); }
+[data-theme="dark"] .member-item { background: var(--surface2); border-color: var(--border); }
+[data-theme="dark"] #theme-toggle-btn { border-color: var(--border); color: var(--text2); }
+

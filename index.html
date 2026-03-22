@@ -23,7 +23,13 @@
           <span class="logo-text">동백전 납부 매칭</span>
           <span id="sync-indicator" style="display:none;font-size:11px;color:var(--text3);margin-left:6px">☁️ 연결 중...</span>
         </div>
-        <button class="settings-btn" onclick="openSettings()" title="설정">⚙️</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="theme-toggle-btn" onclick="toggleTheme()" title="다크/라이트 모드"
+            style="background:none;border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:4px;transition:all 0.2s">
+            <span id="theme-icon">🌙</span><span id="theme-label" style="font-size:12px;font-family:'Noto Sans KR',sans-serif">다크</span>
+          </button>
+          <button class="settings-btn" onclick="openSettings()" title="설정">⚙️</button>
+        </div>
       </div>
     </header>
 
@@ -473,13 +479,22 @@
             <button class="btn btn-ghost btn-sm" onclick="importData()">📥 백업 복원</button>
           </div>
           <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
-          <div class="divider"></div>
+        <div class="divider"></div>
           <h4>📅 월별 데이터 백업</h4>
           <p style="font-size:12px;color:var(--text2);margin-bottom:8px">특정 월의 납부 현황을 별도로 보관할 수 있어요.</p>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input type="month" id="backup-month" style="height:34px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;background:var(--surface)">
             <button class="btn btn-ghost btn-sm" onclick="exportMonthlyJSON()">📤 월별 JSON 백업</button>
             <button class="btn btn-ghost btn-sm" onclick="exportMonthlyExcel()">📊 월별 엑셀 저장 (.xlsx)</button>
+          </div>
+          <div class="divider"></div>
+          <h4>👨‍🏫 선생님 관리</h4>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:8px">선생님을 추가하거나 삭제할 수 있어요.</p>
+          <div id="teacher-list-settings" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="new-teacher-input" placeholder="선생님 이름 입력"
+              style="flex:1;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Noto Sans KR',sans-serif;font-size:13px;background:var(--surface);color:var(--text)">
+            <button class="btn btn-primary btn-sm" onclick="addTeacher()">➕ 추가</button>
           </div>
         </div>
       </div>

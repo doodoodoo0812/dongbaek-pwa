@@ -5,7 +5,8 @@
 let db = {
   members: [],
   payments: [],
-  settings: { apiKey: '' }
+  settings: { apiKey: '' },
+  teachers: ['지사장님', '최수정', '김가영', '이묘련', '김선미', '이현주', '김보온']
 };
 
 let currentTab = 'members';
@@ -41,6 +42,12 @@ function init() {
   // 초기 미납 뱃지
   updateUnpaidBadge();
 
+  // 다크모드 초기화
+  initTheme();
+
+  // 선생님 드롭다운 초기화
+  refreshTeacherDropdowns();
+
   // Firebase 준비 완료 시 실시간 동기화 시작
   window.addEventListener('firebase-ready', () => {
     firebaseReady = true;
@@ -72,6 +79,10 @@ function loadData() {
   const saved = localStorage.getItem('dongbaek_db');
   if (saved) {
     try { db = { ...db, ...JSON.parse(saved) }; } catch (e) {}
+  }
+  // teachers 필드 없으면 기본값 설정
+  if (!db.teachers || db.teachers.length === 0) {
+    db.teachers = ['지사장님', '최수정', '김가영', '이묘련', '김선미', '이현주', '김보온'];
   }
 }
 
@@ -256,19 +267,10 @@ function toggleMemberAddForm() {
 function renderMembers() {
   const query = (document.getElementById('member-search')?.value || '').trim().toLowerCase();
 
-  // 카운트: 실제 회원이 있으면 실제 수, 샘플이면 샘플 수 + 표시
-  const isSample = db.members.length === 0;
   const countEl = document.getElementById('member-count');
-  if (isSample) {
-    const sampleCount = getSampleMembers().length;
-    countEl.textContent = `${sampleCount}명 (샘플)`;
-    countEl.style.background = 'var(--unknown-bg)';
-    countEl.style.color = 'var(--unknown)';
-  } else {
-    countEl.textContent = `${db.members.length}명`;
-    countEl.style.background = '';
-    countEl.style.color = '';
-  }
+  countEl.textContent = `${db.members.length}명`;
+  countEl.style.background = '';
+  countEl.style.color = '';
 
   const resultsDiv = document.getElementById('member-search-results');
   const list = document.getElementById('member-list');
@@ -307,6 +309,7 @@ function renderMembers() {
         </div>
       </div>
       <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEditMember(${m.id})">✏️</button>
         <button class="btn btn-ghost btn-sm" onclick="openMemberHistory(${m.id})">이력</button>
         <button class="btn btn-danger btn-sm" onclick="deleteMember(${m.id})">삭제</button>
       </div>
@@ -315,6 +318,10 @@ function renderMembers() {
 }
 
 // ===== 선생님별 그룹 리스트 =====
+// TEACHER_ORDER는 db.teachers 기반으로 동적 생성
+function getTeacherOrder() {
+  return [...(db.teachers || ['지사장님', '최수정', '김가영', '이묘련', '김선미', '이현주', '김보온']), '(담당 미지정)'];
+}
 const TEACHER_ORDER = ['지사장님', '최수정', '김가영', '이묘련', '김선미', '이현주', '김보온', '(담당 미지정)'];
 
 function renderTeacherGroups() {
@@ -332,7 +339,7 @@ function renderTeacherGroups() {
   });
 
   const teacherNames = Object.keys(groups).sort((a, b) => {
-    const ai = TEACHER_ORDER.indexOf(a), bi = TEACHER_ORDER.indexOf(b);
+    const ai = getTeacherOrder().indexOf(a), bi = getTeacherOrder().indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
     if (ai === -1) return 1;
     if (bi === -1) return -1;
@@ -394,45 +401,8 @@ function toggleTeacherGroup(id) {
   if (el) el.classList.toggle('open');
 }
 
-function getSampleMembers() {
-  return [
-    // 지사장님 - 4명
-    { id:-1,  name:'김민준', mask:'김*준', fee:180000, teacher:'지사장님', memo:'초등4학년' },
-    { id:-2,  name:'이서연', mask:'이*연', fee:200000, teacher:'지사장님', memo:'중등1학년' },
-    { id:-3,  name:'박도현', mask:'박*현', fee:180000, teacher:'지사장님', memo:'초등6학년' },
-    { id:-4,  name:'최아름', mask:'최*름', fee:200000, teacher:'지사장님', memo:'고등1학년' },
-    // 최수정 - 3명
-    { id:-5,  name:'정예린', mask:'정*린', fee:200000, teacher:'최수정', memo:'고등2학년' },
-    { id:-6,  name:'한도윤', mask:'한*윤', fee:180000, teacher:'최수정', memo:'중등3학년' },
-    { id:-7,  name:'오지훈', mask:'오*훈', fee:180000, teacher:'최수정', memo:'초등5학년' },
-    // 김가영 - 4명
-    { id:-8,  name:'윤하은', mask:'윤*은', fee:180000, teacher:'김가영', memo:'초등3학년' },
-    { id:-9,  name:'임준호', mask:'임*호', fee:200000, teacher:'김가영', memo:'중등2학년' },
-    { id:-10, name:'강수아', mask:'강*아', fee:180000, teacher:'김가영', memo:'초등5학년' },
-    { id:-11, name:'조현우', mask:'조*우', fee:200000, teacher:'김가영', memo:'고등1학년' },
-    // 이묘련 - 3명
-    { id:-12, name:'신지민', mask:'신*민', fee:180000, teacher:'이묘련', memo:'중등1학년' },
-    { id:-13, name:'황서준', mask:'황*준', fee:200000, teacher:'이묘련', memo:'고등3학년' },
-    { id:-14, name:'류나연', mask:'류*연', fee:180000, teacher:'이묘련', memo:'초등6학년' },
-    // 김선미 - 4명
-    { id:-15, name:'백승현', mask:'백*현', fee:200000, teacher:'김선미', memo:'고등2학년' },
-    { id:-16, name:'전미래', mask:'전*래', fee:180000, teacher:'김선미', memo:'중등3학년' },
-    { id:-17, name:'남주혁', mask:'남*혁', fee:180000, teacher:'김선미', memo:'초등4학년' },
-    { id:-18, name:'문하린', mask:'문*린', fee:200000, teacher:'김선미', memo:'중등2학년' },
-    // 이현주 - 3명
-    { id:-19, name:'서태양', mask:'서*양', fee:180000, teacher:'이현주', memo:'초등3학년' },
-    { id:-20, name:'노은별', mask:'노*별', fee:200000, teacher:'이현주', memo:'고등1학년' },
-    { id:-21, name:'고준서', mask:'고*서', fee:180000, teacher:'이현주', memo:'중등1학년' },
-    // 김보온 - 4명
-    { id:-22, name:'방채원', mask:'방*원', fee:200000, teacher:'김보온', memo:'고등2학년' },
-    { id:-23, name:'탁지우', mask:'탁*우', fee:180000, teacher:'김보온', memo:'초등6학년' },
-    { id:-24, name:'편수진', mask:'편*진', fee:180000, teacher:'김보온', memo:'중등2학년' },
-    { id:-25, name:'마준혁', mask:'마*혁', fee:200000, teacher:'김보온', memo:'고등3학년' },
-    // 담당 미지정 - 2명
-    { id:-26, name:'박재현', mask:'박*현', fee:180000, teacher:'', memo:'초등5학년' },
-    { id:-27, name:'김소희', mask:'김*희', fee:200000, teacher:'', memo:'중등1학년' },
-  ];
-}
+function getSampleMembers() { return []; }
+
 
 
 function downloadExcelTemplate() {
@@ -979,7 +949,7 @@ function renderStatus() {
   });
 
   const teacherNames = Object.keys(groups).sort((a, b) => {
-    const ai = TEACHER_ORDER.indexOf(a), bi = TEACHER_ORDER.indexOf(b);
+    const ai = getTeacherOrder().indexOf(a), bi = getTeacherOrder().indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
     if (ai === -1) return 1; if (bi === -1) return -1;
     return ai - bi;
@@ -1136,7 +1106,7 @@ function renderFilterList(items, type) {
 
   // 선생님 순 정렬
   filtered.sort((a, b) => {
-    const ai = TEACHER_ORDER.indexOf(a.member.teacher || ''), bi = TEACHER_ORDER.indexOf(b.member.teacher || '');
+    const ai = getTeacherOrder().indexOf(a.member.teacher || ''), bi = getTeacherOrder().indexOf(b.member.teacher || '');
     if (ai === -1 && bi === -1) return (a.member.teacher || '').localeCompare(b.member.teacher || '');
     if (ai === -1) return 1; if (bi === -1) return -1;
     return ai - bi;
@@ -1188,82 +1158,17 @@ function renderFilterList(items, type) {
 // ===== 현황 샘플 =====
 function renderSampleStatus() {
   const list = document.getElementById('status-list');
-  document.getElementById('s-total').textContent = '10';
-  document.getElementById('s-paid').textContent = '6';
-  document.getElementById('s-unpaid').textContent = '2';
-  document.getElementById('s-unknown').textContent = '2';
-
-  const samples = [
-    { name: '김민준', mask: '김*준', teacher: '지사장님', memo: '초등4학년', status: 'paid',    date: '03-03', amount: 180000 },
-    { name: '이서연', mask: '이*연', teacher: '지사장님', memo: '중등1학년', status: 'unknown', date: '',      amount: 200000 },
-    { name: '최지우', mask: '최*우', teacher: '최수정',  memo: '초등6학년', status: 'paid',    date: '03-05', amount: 180000 },
-    { name: '정예린', mask: '정*린', teacher: '최수정',  memo: '고등1학년', status: 'unpaid',  date: '',      amount: 0 },
-    { name: '한도윤', mask: '한*윤', teacher: '김가영',  memo: '중등3학년', status: 'paid',    date: '03-02', amount: 180000 },
-    { name: '오승현', mask: '오*현', teacher: '이묘련',  memo: '고등2학년', status: 'unpaid',  date: '',      amount: 0 },
-    { name: '윤하은', mask: '윤*은', teacher: '김선미',  memo: '초등5학년', status: 'paid',    date: '03-10', amount: 180000 },
-    { name: '임준호', mask: '임*호', teacher: '이현주',  memo: '초등3학년', status: 'unknown', date: '',      amount: 180000 },
-    { name: '강수아', mask: '강*아', teacher: '김보온',  memo: '중등2학년', status: 'paid',    date: '03-04', amount: 200000 },
-    { name: '박재현', mask: '박*현', teacher: '김보온',  memo: '고등3학년', status: 'paid',    date: '03-06', amount: 180000 },
-  ];
-
-  const groups = {};
-  samples.forEach(s => {
-    if (!groups[s.teacher]) groups[s.teacher] = [];
-    groups[s.teacher].push(s);
-  });
-
-  const teacherNames = Object.keys(groups).sort((a, b) => {
-    const ai = TEACHER_ORDER.indexOf(a), bi = TEACHER_ORDER.indexOf(b);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
-
-  list.innerHTML = `<div style="font-size:12px;color:var(--unknown);background:var(--unknown-bg);padding:8px 10px;border-radius:var(--radius-sm);margin-bottom:10px">📋 샘플 데이터 — 회원 등록 후 실제 데이터로 바뀌어요</div>` +
-    teacherNames.map(teacher => {
-      const items = groups[teacher];
-      items.sort((a, b) => ({ unpaid: 0, unknown: 1, paid: 2 }[a.status] - { unpaid: 0, unknown: 1, paid: 2 }[b.status]));
-      const gPaid = items.filter(i => i.status === 'paid').length;
-      const gUnpaid = items.filter(i => i.status === 'unpaid').length;
-      const gUnknown = items.filter(i => i.status === 'unknown').length;
-      const safeId = 'sg-sample-' + teacher.replace(/[\s()]/g, '-');
-
-      const rows = items.map(s => {
-        const badge = s.status === 'paid'
-          ? `<span class="s-badge paid">✅ 납부</span>`
-          : s.status === 'unpaid'
-          ? `<span class="s-badge unpaid">❌ 미납</span>`
-          : `<span class="s-badge unknown">⚠️ 확인필요</span>`;
-        return `
-          <div class="status-row">
-            <div>
-              <div class="status-row-name">${s.name}</div>
-              <div class="status-row-mask">${s.mask} <span style="color:var(--text3);font-family:'Noto Sans KR',sans-serif">${s.memo}</span></div>
-            </div>
-            <div class="status-row-amount">${s.amount ? s.amount.toLocaleString()+'원' : '-'}</div>
-            <div style="font-size:11px;color:var(--text3);text-align:center">${s.date}</div>
-            <div class="status-row-badge">${badge}</div>
-          </div>`;
-      }).join('');
-
-      return `
-        <div class="status-teacher-group" id="${safeId}">
-          <div class="status-teacher-header" onclick="toggleStatusGroup('${safeId}')">
-            <div class="status-teacher-name">👨‍🏫 ${teacher}</div>
-            <div class="status-teacher-summary">
-              ${gPaid > 0 ? `<span style="background:var(--paid-bg);color:var(--paid);padding:2px 7px;border-radius:10px;font-weight:700">✅${gPaid}</span>` : ''}
-              ${gUnpaid > 0 ? `<span style="background:var(--unpaid-bg);color:var(--unpaid);padding:2px 7px;border-radius:10px;font-weight:700">❌${gUnpaid}</span>` : ''}
-              ${gUnknown > 0 ? `<span style="background:var(--unknown-bg);color:var(--unknown);padding:2px 7px;border-radius:10px;font-weight:700">⚠️${gUnknown}</span>` : ''}
-              <span class="status-teacher-arrow">▼</span>
-            </div>
-          </div>
-          <div class="status-teacher-body">
-            <div class="status-col-header">
-              <span>이름</span><span style="text-align:right">금액</span><span style="text-align:center">날짜</span><span style="text-align:center">상태</span>
-            </div>
-            ${rows}
-          </div>
-        </div>`;
-    }).join('');
+  document.getElementById('s-total').textContent = '0';
+  document.getElementById('s-paid').textContent = '0';
+  document.getElementById('s-unpaid').textContent = '0';
+  document.getElementById('s-unknown').textContent = '0';
+  list.innerHTML = `<div class="list-empty" style="padding:40px 16px">
+    <div style="font-size:32px;margin-bottom:12px">👥</div>
+    <div style="font-weight:600;margin-bottom:6px">등록된 회원이 없어요</div>
+    <div style="font-size:12px;color:var(--text3)">회원등록 탭에서 회원을 먼저 등록해주세요</div>
+  </div>`;
 }
+
 function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag-over'); }
 function handleDragLeave() { document.getElementById('upload-zone').classList.remove('drag-over'); }
 function handleDrop(e) {
@@ -1704,6 +1609,7 @@ function openSettings() {
   document.getElementById('api-key-input').value = db.settings.apiKey || '';
   const backupMonth = document.getElementById('backup-month');
   if (backupMonth) backupMonth.value = statusMonth;
+  renderTeacherSettings();
   document.getElementById('settings-modal').style.display = 'flex';
 }
 function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
@@ -1810,7 +1716,7 @@ function exportAllDataExcel() {
   const summaryRows = [summaryHeader];
 
   const sortedMembers = [...db.members].sort((a, b) => {
-    const ai = TEACHER_ORDER.indexOf(a.teacher || ''), bi = TEACHER_ORDER.indexOf(b.teacher || '');
+    const ai = getTeacherOrder().indexOf(a.teacher || ''), bi = getTeacherOrder().indexOf(b.teacher || '');
     if (ai === -1 && bi === -1) return (a.teacher || '').localeCompare(b.teacher || '');
     if (ai === -1) return 1; if (bi === -1) return -1;
     return ai - bi;
@@ -2281,7 +2187,7 @@ function exportMonthlyExcel() {
 
   // 선생님 순서대로 회원 정렬
   const sorted = [...db.members].sort((a, b) => {
-    const ai = TEACHER_ORDER.indexOf(a.teacher || ''), bi = TEACHER_ORDER.indexOf(b.teacher || '');
+    const ai = getTeacherOrder().indexOf(a.teacher || ''), bi = getTeacherOrder().indexOf(b.teacher || '');
     if (ai === -1 && bi === -1) return (a.teacher || '').localeCompare(b.teacher || '');
     if (ai === -1) return 1; if (bi === -1) return -1;
     return ai - bi;
@@ -2377,6 +2283,210 @@ function exportMonthlyExcel() {
   XLSX.utils.book_append_sheet(wb, ws, `${y}년${parseInt(m)}월`);
   XLSX.writeFile(wb, `동백전_납부현황_${month}.xlsx`);
   showToast(`${monthLabel} 엑셀 파일이 다운로드됐어요`);
+}
+
+// ===== 다크/라이트 모드 =====
+function initTheme() {
+  const saved = localStorage.getItem('dongbaek_theme') || 'light';
+  applyTheme(saved);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('dongbaek_theme', theme);
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+  if (label) label.textContent = theme === 'dark' ? '라이트' : '다크';
+}
+
+// ===== 선생님 관리 =====
+function getTeacherList() {
+  return db.teachers || ['지사장님', '최수정', '김가영', '이묘련', '김선미', '이현주', '김보온'];
+}
+
+function renderTeacherSettings() {
+  const list = document.getElementById('teacher-list-settings');
+  if (!list) return;
+  const teachers = getTeacherList();
+  list.innerHTML = teachers.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);padding:6px 10px;border-radius:var(--radius-sm)">
+      <span style="flex:1;font-size:13px">${i+1}. ${t}</span>
+      <button onclick="deleteTeacher(${i})" class="btn btn-danger btn-sm" style="height:26px;padding:0 8px;font-size:11px">삭제</button>
+    </div>`).join('');
+}
+
+function addTeacher() {
+  const input = document.getElementById('new-teacher-input');
+  const name = input?.value.trim();
+  if (!name) { showToast('선생님 이름을 입력하세요'); return; }
+  if (!db.teachers) db.teachers = getTeacherList();
+  if (db.teachers.includes(name)) { showToast('이미 있는 선생님이에요'); return; }
+  db.teachers.push(name);
+  saveData();
+  input.value = '';
+  renderTeacherSettings();
+  refreshTeacherDropdowns();
+  showToast(`${name} 선생님이 추가됐어요`);
+}
+
+function deleteTeacher(idx) {
+  if (!db.teachers) db.teachers = getTeacherList();
+  const name = db.teachers[idx];
+  const hasMembers = db.members.some(m => m.teacher === name);
+  if (hasMembers) {
+    showConfirm('⚠️ 선생님 삭제', `${name} 선생님을 삭제하면 담당 회원들의 선생님 정보가 비워져요. 진행할까요?`, '', () => {
+      db.members.forEach(m => { if (m.teacher === name) m.teacher = ''; });
+      db.teachers.splice(idx, 1);
+      saveData(); renderTeacherSettings(); refreshTeacherDropdowns(); renderMembers();
+      showToast(`${name} 선생님이 삭제됐어요`);
+    });
+  } else {
+    db.teachers.splice(idx, 1);
+    saveData(); renderTeacherSettings(); refreshTeacherDropdowns();
+    showToast(`${name} 선생님이 삭제됐어요`);
+  }
+}
+
+function refreshTeacherDropdowns() {
+  // 모든 선생님 select 업데이트
+  const teachers = getTeacherList();
+  const opts = '<option value="">선택하세요</option>' +
+    teachers.map(t => `<option value="${t}">${t}</option>`).join('');
+  ['m-teacher', 'r-teacher'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { const val = el.value; el.innerHTML = opts; el.value = val; }
+  });
+}
+
+// ===== 결제 내역 카드 수정 =====
+function openEditPayment(paymentId) {
+  const p = db.payments.find(p => p.id === paymentId);
+  if (!p) return;
+  const teachers = getTeacherList();
+  const memberOpts = '<option value="">미매칭</option>' +
+    db.members.map(m => `<option value="${m.id}" ${p.memberId === m.id ? 'selected' : ''}>${m.name} (${m.mask || '-'})</option>`).join('');
+
+  document.getElementById('match-modal-title').textContent = '✏️ 결제 내역 수정';
+  document.getElementById('match-modal-body').innerHTML = `
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-field">
+        <label>결제 날짜</label>
+        <input type="date" id="edit-p-date" value="${p.date || ''}" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field">
+        <label>결제 시간</label>
+        <input type="time" id="edit-p-time" value="${p.time || ''}" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field">
+        <label>결제자(마스킹)</label>
+        <input type="text" id="edit-p-payer" value="${p.payer || ''}" placeholder="김*수" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field">
+        <label>금액(원)</label>
+        <input type="number" id="edit-p-amount" value="${p.amount || ''}" placeholder="180000" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field" style="grid-column:1/-1">
+        <label>매칭 회원</label>
+        <select id="edit-p-member" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">${memberOpts}</select>
+      </div>
+    </div>`;
+  document.getElementById('match-modal-footer').innerHTML = `
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-full" onclick="closeMatchModal()">취소</button>
+      <button class="btn btn-primary btn-full" onclick="saveEditPayment(${paymentId})">💾 저장</button>
+    </div>`;
+  document.getElementById('match-modal').style.display = 'flex';
+}
+
+function saveEditPayment(paymentId) {
+  const p = db.payments.find(p => p.id === paymentId);
+  if (!p) return;
+  const date = document.getElementById('edit-p-date').value;
+  const time = document.getElementById('edit-p-time').value;
+  const payer = document.getElementById('edit-p-payer').value.trim();
+  const amount = parseInt(document.getElementById('edit-p-amount').value) || 0;
+  const memberIdStr = document.getElementById('edit-p-member').value;
+  p.date = date; p.time = time; p.payer = payer; p.amount = amount;
+  p.datetime = date ? `${date}${time ? ' ' + time : ''}` : '';
+  p.memberId = memberIdStr ? parseInt(memberIdStr) : null;
+  saveData(); renderPayments(); if (currentTab === 'status') renderStatus(); updateUnpaidBadge();
+  closeMatchModal();
+  showToast('수정됐어요');
+}
+
+// ===== 회원 카드 수정 =====
+function openEditMember(memberId) {
+  const m = db.members.find(m => m.id === memberId);
+  if (!m) return;
+  const teachers = getTeacherList();
+  const teacherOpts = '<option value="">선택하세요</option>' +
+    teachers.map(t => `<option value="${t}" ${m.teacher === t ? 'selected' : ''}>${t}</option>`).join('');
+  const feeOpts = ['', '180000', '200000'].map(v =>
+    `<option value="${v}" ${String(m.fee) === v ? 'selected' : ''}>${v === '' ? '선택하세요' : v === '180000' ? '18만원' : '20만원'}</option>`
+  ).join('') + `<option value="custom" ${m.fee && m.fee !== 180000 && m.fee !== 200000 ? 'selected' : ''}>직접입력</option>`;
+
+  document.getElementById('match-modal-title').textContent = '✏️ 회원 정보 수정';
+  document.getElementById('match-modal-body').innerHTML = `
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-field">
+        <label>회원 이름</label>
+        <input type="text" id="edit-m-name" value="${m.name}" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field">
+        <label>마스킹 패턴</label>
+        <input type="text" id="edit-m-mask" value="${m.mask || ''}" placeholder="김*수" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field">
+        <label>월 납부액</label>
+        <select id="edit-m-fee" onchange="toggleEditFee()" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">${feeOpts}</select>
+      </div>
+      <div class="form-field" id="edit-m-fee-wrap" style="${m.fee && m.fee !== 180000 && m.fee !== 200000 ? '' : 'display:none'}">
+        <label>납부액 직접입력</label>
+        <input type="number" id="edit-m-fee-custom" value="${m.fee || ''}" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+      <div class="form-field">
+        <label>담당 선생님</label>
+        <select id="edit-m-teacher" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">${teacherOpts}</select>
+      </div>
+      <div class="form-field">
+        <label>메모</label>
+        <input type="text" id="edit-m-memo" value="${m.memo || ''}" placeholder="초등3학년" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface);color:var(--text);width:100%">
+      </div>
+    </div>`;
+  document.getElementById('match-modal-footer').innerHTML = `
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-full" onclick="closeMatchModal()">취소</button>
+      <button class="btn btn-primary btn-full" onclick="saveEditMember(${memberId})">💾 저장</button>
+    </div>`;
+  document.getElementById('match-modal').style.display = 'flex';
+}
+
+function toggleEditFee() {
+  const sel = document.getElementById('edit-m-fee');
+  const wrap = document.getElementById('edit-m-fee-wrap');
+  if (wrap) wrap.style.display = sel?.value === 'custom' ? '' : 'none';
+}
+
+function saveEditMember(memberId) {
+  const m = db.members.find(m => m.id === memberId);
+  if (!m) return;
+  const feeSel = document.getElementById('edit-m-fee')?.value;
+  const fee = feeSel === 'custom'
+    ? (parseInt(document.getElementById('edit-m-fee-custom')?.value) || 0)
+    : (parseInt(feeSel) || 0);
+  m.name = document.getElementById('edit-m-name')?.value.trim() || m.name;
+  m.mask = document.getElementById('edit-m-mask')?.value.trim() || m.mask;
+  m.fee = fee; m.teacher = document.getElementById('edit-m-teacher')?.value || '';
+  m.memo = document.getElementById('edit-m-memo')?.value.trim() || '';
+  saveData(); renderMembers(); if (currentTab === 'status') renderStatus();
+  closeMatchModal();
+  showToast('수정됐어요');
 }
 
 // ===== 토스트 =====
