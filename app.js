@@ -188,6 +188,8 @@ function addMember() {
 
   db.members.push({ id: Date.now(), name, mask, fee, teacher, memo, createdAt: new Date().toISOString() });
   saveData(); renderMembers(); clearMemberForm();
+  if (currentTab === 'status') renderStatus();
+  updateUnpaidBadge();
   // 추가 후 폼 닫기
   const form = document.getElementById('member-add-form');
   const btn = document.getElementById('add-toggle-btn');
@@ -506,7 +508,7 @@ function handleExcelUpload(e) {
         added++;
       });
 
-      saveData(); renderMembers();
+      saveData(); renderMembers(); updateUnpaidBadge();
       let msg = `${added}명 추가됐어요`;
       if (skipped) msg += `, ${skipped}명 중복 건너뜀`;
       if (warnings.length) {
@@ -627,10 +629,74 @@ function pushPayment(date, time, payer, amount, memberName = '') {
   showToast(matchedName ? `내역 추가 및 ${matchedName} 매칭 완료!` : '내역이 추가됐어요');
 }
 
+// ===== 결제 내역 수정 =====
+function openEditPayment(id) {
+  const p = db.payments.find(p => p.id === id);
+  if (!p) return;
+  const member = p.memberId ? db.members.find(m => m.id === p.memberId) : null;
+
+  document.getElementById('match-modal-title').textContent = '✏️ 결제 내역 수정';
+  document.getElementById('match-modal-body').innerHTML = `
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-field">
+        <label>결제 날짜</label>
+        <input type="date" id="edit-p-date" value="${p.date || ''}">
+      </div>
+      <div class="form-field">
+        <label>결제 시간</label>
+        <input type="time" id="edit-p-time" value="${p.time || ''}">
+      </div>
+      <div class="form-field">
+        <label>결제자 (마스킹)</label>
+        <input type="text" id="edit-p-payer" value="${p.payer || ''}" placeholder="김*수">
+      </div>
+      <div class="form-field">
+        <label>금액 (원)</label>
+        <input type="number" id="edit-p-amount" value="${p.amount || ''}" placeholder="180000">
+      </div>
+      <div class="form-field">
+        <label>매칭 회원</label>
+        <select id="edit-p-member">
+          <option value="">미매칭</option>
+          ${db.members.map(m => `<option value="${m.id}" ${p.memberId === m.id ? 'selected' : ''}>${m.name} (${m.teacher || '-'})</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  `;
+  document.getElementById('match-modal-footer').innerHTML = `
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-full" onclick="closeMatchModal()">취소</button>
+      <button class="btn btn-primary btn-full" onclick="saveEditPayment(${id})">💾 저장</button>
+    </div>`;
+  document.getElementById('match-modal').style.display = 'flex';
+}
+
+function saveEditPayment(id) {
+  const p = db.payments.find(p => p.id === id);
+  if (!p) return;
+  const date = document.getElementById('edit-p-date').value;
+  const time = document.getElementById('edit-p-time').value;
+  const payer = document.getElementById('edit-p-payer').value.trim();
+  const amount = parseInt(document.getElementById('edit-p-amount').value) || 0;
+  const memberIdStr = document.getElementById('edit-p-member').value;
+  const memberId = memberIdStr ? parseInt(memberIdStr) : null;
+
+  p.date = date;
+  p.time = time;
+  p.datetime = date ? `${date}${time ? ' ' + time : ''}` : '';
+  p.payer = payer;
+  p.amount = amount;
+  p.memberId = memberId;
+
+  saveData(); renderPayments(); renderStatus();
+  closeMatchModal();
+  showToast('수정됐어요');
+}
+
 function deletePayment(id) {
   showConfirm('🗑️ 내역 삭제', '이 결제 내역을 삭제할까요?', '', () => {
     db.payments = db.payments.filter(p => p.id !== id);
-    saveData(); renderPayments();
+    saveData(); renderPayments(); updateUnpaidBadge();
     if (currentTab === 'status') renderStatus();
     showToast('삭제됐어요');
   });
@@ -654,28 +720,31 @@ function renderPayments() {
   list.innerHTML = sorted.map(p => {
     const member = p.memberId ? db.members.find(m => m.id === p.memberId) : null;
     const candidates = getCandidates(p.payer);
+    const matchHtml = member
+      ? `<span style="color:var(--paid);font-size:12px;font-weight:500">✅ ${member.name}${member.teacher ? ' · ' + member.teacher : ''}</span>`
+      : candidates.length === 1
+        ? `<span style="color:var(--unknown);font-size:12px;cursor:pointer" onclick="confirmAssign(${p.id},${candidates[0].id})">🔗 ${candidates[0].name}? (클릭매칭)</span>`
+        : candidates.length > 1
+          ? `<span style="color:var(--unknown);font-size:12px;cursor:pointer" onclick="openMatchModal(${p.id})">⚠️ 후보 ${candidates.length}명 (클릭선택)</span>`
+          : `<span style="color:var(--text3);font-size:12px">미매칭</span>`;
+
     return `
-      <div class="payment-item">
-        <div class="payment-row">
-          <span class="payment-payer">${p.payer || '(이름없음)'}</span>
-          <span class="payment-amount">${p.amount ? p.amount.toLocaleString() + '원' : '-'}</span>
+      <div class="payment-item" id="pitem-${p.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--primary)">${p.payer || '(이름없음)'}</span>
+              <span style="font-size:15px;font-weight:700">${p.amount ? p.amount.toLocaleString() + '원' : '-'}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:4px">${p.datetime || '-'}</div>
+            <div>${matchHtml}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="openEditPayment(${p.id})">✏️ 수정</button>
+            <button class="btn btn-danger btn-sm" style="font-size:11px" onclick="deletePayment(${p.id})">삭제</button>
+          </div>
         </div>
-        <div class="payment-row">
-          <span class="payment-datetime">${p.datetime || '-'}</span>
-          ${member
-            ? `<span class="payment-matched">✅ ${member.name}</span>`
-            : candidates.length === 1
-              ? `<span class="payment-matched" style="cursor:pointer" onclick="confirmAssign(${p.id},${candidates[0].id})">🔗 ${candidates[0].name}?</span>`
-              : candidates.length > 1
-                ? `<span style="cursor:pointer;color:var(--unknown);font-size:12px" onclick="openMatchModal(${p.id})">⚠️ 후보 ${candidates.length}명</span>`
-                : `<span class="payment-unmatched">미매칭</span>`
-          }
-        </div>
-        <div style="margin-top:6px;display:flex;justify-content:flex-end">
-          <button class="btn btn-ghost btn-sm" onclick="deletePayment(${p.id})">삭제</button>
-        </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
@@ -728,7 +797,7 @@ function confirmAssign(paymentId, memberId) {
 function assignPayment(paymentId, memberId) {
   const p = db.payments.find(p => p.id === paymentId);
   if (p) { p.memberId = memberId; saveData(); }
-  renderPayments(); renderStatus();
+  renderPayments(); renderStatus(); updateUnpaidBadge();
   const m = db.members.find(m => m.id === memberId);
   showToast(`${m?.name}으로 매칭됐어요`);
   closeMatchModal();
@@ -737,7 +806,7 @@ function assignPayment(paymentId, memberId) {
 function unassignPayment(paymentId) {
   const p = db.payments.find(p => p.id === paymentId);
   if (p) { p.memberId = null; saveData(); }
-  renderStatus();
+  renderStatus(); renderPayments(); updateUnpaidBadge();
   showToast('매칭이 취소됐어요');
 }
 
@@ -763,7 +832,7 @@ function runAutoMatch() {
     }
   });
 
-  saveData(); renderPayments(); renderStatus();
+  saveData(); renderPayments(); renderStatus(); updateUnpaidBadge();
 
   if (multipleList.length > 0) {
     showConfirm('🔗 자동 매칭 완료 (수동 확인 필요)',
@@ -792,6 +861,7 @@ function changeMonth(delta) {
   statusMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   setMonth(statusMonth);
   renderStatus();
+  updateUnpaidBadge();
 }
 
 // ===== 월 달력 피커 =====
@@ -833,6 +903,7 @@ function selectPickerMonth(ym) {
   statusMonth = ym;
   setMonth(ym);
   renderStatus();
+  updateUnpaidBadge();
 }
 
 function renderStatus() {
@@ -860,11 +931,39 @@ function renderStatus() {
   document.getElementById('s-unpaid').textContent = unpaid;
   document.getElementById('s-unknown').textContent = unknown;
 
+  // 금액 요약 계산
+  const totalExpected = db.members.reduce((s, m) => s + (m.fee || 0), 0);
+  const totalPaid = items
+    .filter(i => i.status === 'paid')
+    .reduce((s, i) => {
+      const lastPay = i.mPayments[i.mPayments.length - 1];
+      return s + (lastPay?.amount || i.member.fee || 0);
+    }, 0);
+  const totalUnpaid = totalExpected - totalPaid;
+
+  const fmt = v => v >= 10000
+    ? (v % 10000 === 0 ? (v/10000) + '만원' : v.toLocaleString() + '원')
+    : v.toLocaleString() + '원';
+
+  const amtTotal = document.getElementById('s-amount-total');
+  const amtPaid = document.getElementById('s-amount-paid');
+  const amtUnpaid = document.getElementById('s-amount-unpaid');
+  if (amtTotal) amtTotal.textContent = fmt(totalExpected);
+  if (amtPaid) amtPaid.textContent = fmt(totalPaid);
+  if (amtUnpaid) amtUnpaid.textContent = fmt(totalUnpaid > 0 ? totalUnpaid : 0);
+
   // 납부율 바 + 미납 뱃지 업데이트
   updatePaymentRate(paid, db.members.length);
   updateUnpaidBadge();
 
-  // 필터 적용
+  // 활성 통계카드 표시 갱신
+  updateStatCardHighlight();
+
+  // 필터 리스트 갱신 (열려있으면)
+  if (currentStatusFilter && currentStatusFilter !== 'none') {
+    renderFilterList(items, currentStatusFilter);
+  }
+
   const filtered = items;
   if (!filtered.length) {
     list.innerHTML = `<div class="list-empty">해당 항목이 없어요</div>`;
@@ -964,6 +1063,126 @@ function renderStatus() {
 function toggleStatusGroup(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('open');
+}
+
+// ===== 납부현황 필터 =====
+let currentStatusFilter = 'none';
+
+function setStatusFilter(type) {
+  if (currentStatusFilter === type) {
+    // 같은 카드 다시 클릭 → 닫기
+    currentStatusFilter = 'none';
+    document.getElementById('status-filter-area').style.display = 'none';
+    updateStatCardHighlight();
+    return;
+  }
+  currentStatusFilter = type;
+  updateStatCardHighlight();
+
+  if (type === 'none') {
+    document.getElementById('status-filter-area').style.display = 'none';
+    return;
+  }
+
+  // 현재 items 다시 계산
+  const monthPayments = db.payments.filter(p => p.date && p.date.startsWith(statusMonth));
+  const items = db.members.map(m => {
+    const mPayments = monthPayments.filter(p => p.memberId === m.id);
+    const candidatePayments = monthPayments.filter(p => !p.memberId && getCandidates(p.payer).some(c => c.id === m.id));
+    let status;
+    if (mPayments.length > 0) status = 'paid';
+    else if (candidatePayments.length > 0) status = 'unknown';
+    else status = 'unpaid';
+    return { member: m, status, mPayments, candidatePayments };
+  });
+
+  renderFilterList(items, type);
+}
+
+function updateStatCardHighlight() {
+  ['all', 'paid', 'unpaid', 'unknown'].forEach(t => {
+    const el = document.getElementById(`sf-${t}`);
+    if (!el) return;
+    if (currentStatusFilter === t) {
+      el.style.outline = '2.5px solid var(--primary)';
+      el.style.outlineOffset = '2px';
+    } else {
+      el.style.outline = 'none';
+    }
+  });
+}
+
+function renderFilterList(items, type) {
+  const area = document.getElementById('status-filter-area');
+  const listEl = document.getElementById('status-filter-list');
+  const labelEl = document.getElementById('status-filter-label');
+  if (!area || !listEl) return;
+
+  const labelMap = {
+    all: '📋 전체 회원',
+    paid: '✅ 납부 완료',
+    unpaid: '❌ 미납',
+    unknown: '⚠️ 확인 필요'
+  };
+  labelEl.textContent = labelMap[type] || '';
+
+  const filtered = type === 'all' ? items : items.filter(i => i.status === type);
+
+  if (!filtered.length) {
+    listEl.innerHTML = `<div class="list-empty">해당 항목이 없어요</div>`;
+    area.style.display = 'block';
+    return;
+  }
+
+  // 선생님 순 정렬
+  filtered.sort((a, b) => {
+    const ai = TEACHER_ORDER.indexOf(a.member.teacher || ''), bi = TEACHER_ORDER.indexOf(b.member.teacher || '');
+    if (ai === -1 && bi === -1) return (a.member.teacher || '').localeCompare(b.member.teacher || '');
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  listEl.innerHTML = filtered.map(({ member: m, status, mPayments, candidatePayments }) => {
+    const lastPay = mPayments[mPayments.length - 1];
+    const badgeHtml = status === 'paid'
+      ? `<span class="s-badge paid">✅ 납부</span>`
+      : status === 'unpaid'
+      ? `<span class="s-badge unpaid">❌ 미납</span>`
+      : `<span class="s-badge unknown">⚠️ 확인필요</span>`;
+
+    const payInfo = status === 'paid' && lastPay
+      ? `<span style="font-size:11px;color:var(--text3)">${lastPay.date || ''} · ${lastPay.amount ? lastPay.amount.toLocaleString()+'원' : ''}</span>`
+      : m.fee ? `<span style="font-size:11px;color:var(--text3)">${m.fee.toLocaleString()}원/월</span>` : '';
+
+    const candTags = status === 'unknown'
+      ? candidatePayments.map(p =>
+          `<span class="s-badge unknown" onclick="confirmAssign(${p.id},${m.id})" style="cursor:pointer;margin-top:4px">
+            ${p.payer} ${p.amount ? p.amount.toLocaleString()+'원' : ''} 클릭매칭
+          </span>`
+        ).join(' ')
+      : '';
+
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);margin-bottom:6px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:14px">${m.name}</span>
+            <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--primary)">${m.mask || ''}</span>
+            ${badgeHtml}
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">
+            👨‍🏫 ${m.teacher || '-'} &nbsp;·&nbsp; ${payInfo}
+            ${m.memo ? `&nbsp;·&nbsp;<span style="color:var(--text3)">${m.memo}</span>` : ''}
+          </div>
+          ${candTags ? `<div style="margin-top:4px">${candTags}</div>` : ''}
+        </div>
+        <div style="flex-shrink:0;margin-left:8px;display:flex;gap:4px">
+          ${status === 'paid' && lastPay ? `<button class="btn btn-ghost btn-sm" onclick="unassignPayment(${lastPay.id})" style="font-size:11px">매칭취소</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  area.style.display = 'block';
 }
 
 // ===== 현황 샘플 =====
@@ -1640,7 +1859,7 @@ function handleImport(e) {
       const imported = JSON.parse(ev.target.result);
       showConfirm('📥 데이터 복원', '기존 데이터를 모두 덮어쓸까요?\n이 작업은 되돌릴 수 없어요.', '', () => {
         db = { ...db, ...imported };
-        saveData(); renderMembers(); renderPayments(); renderStatus(); closeSettings();
+        saveData(); renderMembers(); renderPayments(); renderStatus(); updateUnpaidBadge(); closeSettings();
         showToast('데이터가 복원됐어요');
       });
     } catch { showToast('파일 형식이 올바르지 않아요'); }
@@ -2002,6 +2221,32 @@ function saveMemoFromHistory(memberId) {
   saveData(); renderMembers();
   closeHistoryModal();
   showToast('메모가 저장됐어요');
+}
+
+// ===== 메모 인라인 수정 (선생님별 리스트) =====
+function startMemoEdit(memberId) {
+  const displayEl = document.getElementById(`memo-display-${memberId}`);
+  const editEl = document.getElementById(`memo-edit-${memberId}`);
+  if (displayEl) displayEl.style.display = 'none';
+  if (editEl) editEl.style.display = 'flex';
+  const input = document.getElementById(`memo-input-${memberId}`);
+  if (input) input.focus();
+}
+
+function saveMemoInline(memberId) {
+  const m = db.members.find(m => m.id === memberId);
+  if (!m) return;
+  const input = document.getElementById(`memo-input-${memberId}`);
+  m.memo = input ? input.value.trim() : m.memo;
+  saveData(); renderMembers();
+  showToast('메모가 저장됐어요');
+}
+
+function cancelMemoEdit(memberId) {
+  const displayEl = document.getElementById(`memo-display-${memberId}`);
+  const editEl = document.getElementById(`memo-edit-${memberId}`);
+  if (displayEl) displayEl.style.display = 'inline';
+  if (editEl) editEl.style.display = 'none';
 }
 
 function closeHistoryModal() { document.getElementById('history-modal').style.display = 'none'; }

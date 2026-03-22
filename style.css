@@ -331,7 +331,9 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 8px; text-align: center;
+  transition: transform 0.1s, box-shadow 0.1s;
 }
+.stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 .stat-card.stat-paid { background: var(--paid-bg); border-color: #a8d5bb; }
 .stat-card.stat-unpaid { background: var(--unpaid-bg); border-color: #f0b0b0; }
 .stat-card.stat-unknown { background: var(--unknown-bg); border-color: #f0d090; }
