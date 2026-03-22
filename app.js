@@ -571,6 +571,7 @@ function addPayment() {
   const time = document.getElementById('p-time').value;
   const payer = document.getElementById('p-payer').value.trim();
   const amount = getPaymentFeeValue();
+  const memberName = (document.getElementById('p-member-name')?.value || '').trim();
 
   if (!date && !payer) { showToast('날짜 또는 결제자를 입력하세요'); return; }
 
@@ -579,7 +580,7 @@ function addPayment() {
   if (dup) {
     showConfirm('⚠️ 중복 결제 의심', `동일한 날짜·결제자·금액의 내역이 이미 있어요.\n정말 추가할까요?`,
       `날짜: ${date}\n결제자: ${payer}\n금액: ${amount.toLocaleString()}원`, () => {
-        pushPayment(date, time, payer, amount);
+        pushPayment(date, time, payer, amount, memberName);
       });
     return;
   }
@@ -591,23 +592,39 @@ function addPayment() {
     const m = db.members.find(m => m.id === sameMonthSamePayer[0].memberId);
     showConfirm('⚠️ 이중 납부 의심', `${month} 에 "${payer}" 결제자가 이미 납부한 내역이 있어요.\n중복 납부일 수 있어요.`,
       `기존 납부: ${sameMonthSamePayer[0].datetime} · ${sameMonthSamePayer[0].amount?.toLocaleString()}원${m ? ' → ' + m.name : ''}`, () => {
-        pushPayment(date, time, payer, amount);
+        pushPayment(date, time, payer, amount, memberName);
       });
     return;
   }
 
-  pushPayment(date, time, payer, amount);
+  pushPayment(date, time, payer, amount, memberName);
 }
 
-function pushPayment(date, time, payer, amount) {
+function pushPayment(date, time, payer, amount, memberName = '') {
   const datetime = date ? `${date}${time ? ' ' + time : ''}` : '';
-  db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId: null, createdAt: new Date().toISOString() });
-  saveData(); renderPayments();
+
+  // 회원 이름으로 직접 매칭 시도
+  let memberId = null;
+  if (memberName) {
+    const found = db.members.find(m => m.name === memberName);
+    if (found) memberId = found.id;
+  }
+  // 마스킹 이름으로 자동 매칭 시도
+  if (!memberId && payer) {
+    const cands = getCandidates(payer);
+    if (cands.length === 1) memberId = cands[0].id;
+  }
+
+  db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId, createdAt: new Date().toISOString() });
+  saveData(); renderPayments(); updateUnpaidBadge();
   document.getElementById('p-payer').value = '';
   document.getElementById('p-fee-select').value = '';
   document.getElementById('p-amount').value = '';
   document.getElementById('p-fee-custom-wrap').style.display = 'none';
-  showToast('내역이 추가됐어요');
+  const nameEl = document.getElementById('p-member-name');
+  if (nameEl) nameEl.value = '';
+  const matchedName = memberId ? db.members.find(m => m.id === memberId)?.name : null;
+  showToast(matchedName ? `내역 추가 및 ${matchedName} 매칭 완료!` : '내역이 추가됐어요');
 }
 
 function deletePayment(id) {
@@ -1053,46 +1070,106 @@ function handleFileSelect(e) {
   e.target.value = '';
 }
 
-// ===== 여러 장 순차 처리 큐 =====
-let imageQueue = [];
+// ===== 캡처 대기열 (썸네일) =====
+let captureQueue = []; // { base64, dataUrl }
+let imageQueue = [];   // 분석 진행 중 큐
 let isProcessingQueue = false;
 
-async function loadImageQueue(files) {
-  // 일괄 탭으로 자동 전환 안 하고, 캡처 탭에서 큐로 순서대로 처리
-  showToast(`${files.length}장을 순서대로 처리할게요`);
-  imageQueue = [...files];
-  if (!isProcessingQueue) processNextInQueue();
+function addToQueue(files) {
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      captureQueue.push({ base64: dataUrl.split(',')[1], dataUrl });
+      renderThumbnails();
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
-async function processNextInQueue() {
+function renderThumbnails() {
+  const area = document.getElementById('capture-queue-area');
+  const container = document.getElementById('capture-thumbnails');
+  const countEl = document.getElementById('queue-count');
+  if (!area || !container) return;
+  if (captureQueue.length === 0) { area.style.display = 'none'; return; }
+  area.style.display = 'block';
+  if (countEl) countEl.textContent = captureQueue.length;
+  container.innerHTML = captureQueue.map((item, i) => `
+    <div style="position:relative;width:72px;height:72px;flex-shrink:0">
+      <img src="${item.dataUrl}" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border)">
+      <button onclick="removeFromQueue(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--unpaid);color:white;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center">✕</button>
+      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.45);border-radius:0 0 5px 5px;font-size:9px;color:white;text-align:center;padding:2px">${i+1}</div>
+    </div>`).join('');
+}
+
+function removeFromQueue(i) {
+  captureQueue.splice(i, 1);
+  renderThumbnails();
+}
+
+function clearAllQueue() {
+  captureQueue = [];
+  renderThumbnails();
+}
+
+async function startAnalyzeQueue() {
+  if (captureQueue.length === 0) { showToast('사진을 먼저 올려주세요'); return; }
+  if (!db.settings.apiKey) { openSettings(); return; }
+  const btn = document.getElementById('start-analyze-btn');
+  if (btn) btn.disabled = true;
+  imageQueue = [...captureQueue];
+  captureQueue = [];
+  renderThumbnails();
+  isProcessingQueue = true;
+  processNextInQueueBase64();
+}
+
+async function processNextInQueueBase64() {
   if (imageQueue.length === 0) {
     isProcessingQueue = false;
+    const btn = document.getElementById('start-analyze-btn');
+    if (btn) btn.disabled = false;
+    const banner = document.getElementById('queue-banner');
+    if (banner) banner.style.display = 'none';
     showToast('모든 사진 처리 완료!');
     return;
   }
-  isProcessingQueue = true;
-  const file = imageQueue.shift();
+  const item = imageQueue.shift();
   const remaining = imageQueue.length;
-
-  // 큐 진행 상태 표시
-  const queueBanner = document.getElementById('queue-banner');
-  if (queueBanner) {
-    queueBanner.style.display = remaining > 0 ? 'block' : 'none';
-    queueBanner.textContent = `📋 처리 중... 남은 사진: ${remaining}장 (저장 후 자동으로 다음 사진으로 넘어가요)`;
+  const banner = document.getElementById('queue-banner');
+  if (banner) {
+    banner.style.display = 'block';
+    banner.textContent = `📋 분석 중... 남은 사진 ${remaining}장 (저장 후 자동으로 다음으로 넘어가요)`;
   }
-
-  loadImageFile(file);
+  pendingImageBase64 = item.base64;
+  const previewImg = document.getElementById('preview-img');
+  const previewArea = document.getElementById('preview-area');
+  const uploadZone = document.getElementById('upload-zone');
+  if (previewImg) previewImg.src = item.dataUrl;
+  if (previewArea) previewArea.style.display = 'block';
+  if (uploadZone) uploadZone.style.display = 'none';
+  document.getElementById('result-card').style.display = 'block';
+  document.getElementById('no-api-card').style.display = 'none';
+  analyzeImage();
 }
 
 // 캡처 저장 후 다음 큐 자동 처리
 function afterCaptureSaved() {
   if (imageQueue.length > 0) {
-    setTimeout(() => processNextInQueue(), 400);
+    setTimeout(() => processNextInQueueBase64(), 400);
   } else {
     isProcessingQueue = false;
-    const queueBanner = document.getElementById('queue-banner');
-    if (queueBanner) queueBanner.style.display = 'none';
+    const banner = document.getElementById('queue-banner');
+    if (banner) banner.style.display = 'none';
+    const btn = document.getElementById('start-analyze-btn');
+    if (btn) btn.disabled = false;
   }
+}
+
+// 파일 → 대기열에 추가 (분석 안 함)
+function loadImageQueue(files) {
+  addToQueue(files);
 }
 function handlePaste(e) {
   if (currentTab !== 'payments') return;
@@ -1117,24 +1194,9 @@ function handlePaste(e) {
   }
 }
 
+// 단일 파일 → 대기열에 추가 (자동 분석 안 함)
 function loadImageFile(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const dataUrl = e.target.result;
-    pendingImageBase64 = dataUrl.split(',')[1];
-    document.getElementById('preview-img').src = dataUrl;
-    document.getElementById('preview-area').style.display = 'block';
-    document.getElementById('upload-zone').style.display = 'none';
-    if (db.settings.apiKey) {
-      document.getElementById('result-card').style.display = 'block';
-      document.getElementById('no-api-card').style.display = 'none';
-      analyzeImage();
-    } else {
-      document.getElementById('no-api-card').style.display = 'block';
-      document.getElementById('result-card').style.display = 'none';
-    }
-  };
-  reader.readAsDataURL(file);
+  addToQueue([file]);
 }
 
 function clearPreview() {
@@ -1199,7 +1261,7 @@ async function analyzeImage() {
           }],
           generationConfig: {
             temperature: 0,
-            maxOutputTokens: 512,
+            maxOutputTokens: 1024,
             responseMimeType: 'application/json'
           }
         })
@@ -1233,6 +1295,17 @@ async function analyzeImage() {
     if (!result) {
       const jsonMatch = text.match(/\{[\s\S]*?\}/);
       if (jsonMatch) { try { result = JSON.parse(jsonMatch[0]); } catch {} }
+    }
+    // JSON이 잘린 경우 복구 시도
+    if (!result && text.includes('{')) {
+      try {
+        // 잘린 JSON 끝에 닫는 괄호 추가해서 파싱 시도
+        let fixed = text.slice(text.indexOf('{'));
+        // 마지막 완전한 키:값 쌍까지만 추출
+        fixed = fixed.replace(/,?\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
+        if (!fixed.endsWith('}')) fixed += '}';
+        result = JSON.parse(fixed);
+      } catch {}
     }
     if (!result) { result = extractFromText(text); }
     if (!result) throw new Error(`인식 결과를 읽지 못했어요.\n원본 응답: ${text.slice(0, 100)}`);
@@ -1682,7 +1755,7 @@ async function analyzeBulkImages() {
               { text: prompt },
               { inline_data: { mime_type: 'image/jpeg', data: bulkImages[i].base64 } }
             ]}],
-            generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' }
+            generationConfig: { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json' }
           })
         }
       );

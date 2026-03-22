@@ -187,6 +187,10 @@
                 <label>금액 직접 입력 (원)</label>
                 <input type="number" id="p-amount" placeholder="예: 150000">
               </div>
+              <div class="form-field">
+                <label>회원(학생) 이름 <span style="color:var(--text3);font-weight:400">(선택)</span></label>
+                <input type="text" id="p-member-name" placeholder="알고 있으면 입력">
+              </div>
             </div>
             <button class="btn btn-primary btn-full" onclick="addPayment()">➕ 내역 추가</button>
           </div>
@@ -195,9 +199,9 @@
         <!-- ── 캡처 사진 ── -->
         <div id="input-capture" style="display:none">
           <div class="card">
-            <p class="card-desc">학부모에게 받은 동백전 결제 캡처 또는 카카오톡 메시지를 올려주세요.<br>Gemini AI가 날짜·시간·금액·이름을 자동으로 읽어요.<br><span style="color:var(--primary);font-weight:500">여러 장을 한꺼번에 드래그하면 순서대로 자동 처리돼요!</span></p>
-            <!-- 큐 진행 배너 -->
-            <div id="queue-banner" style="display:none;background:var(--primary-light);color:var(--primary);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;margin-bottom:10px"></div>
+            <p class="card-desc">동백전 결제 캡처 또는 카카오톡 메시지를 올려주세요.<br>여러 장을 한꺼번에 올리고 버튼 누르면 순서대로 처리해요.</p>
+
+            <!-- 업로드 존 -->
             <div class="upload-zone" id="upload-zone"
                  ondrop="handleDrop(event)"
                  ondragover="handleDragOver(event)"
@@ -208,10 +212,29 @@
               <div class="upload-sub">여러 장 한꺼번에 가능 · Ctrl+V 붙여넣기</div>
               <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFileSelect(event)">
             </div>
+
+            <!-- 썸네일 대기열 -->
+            <div id="capture-queue-area" style="display:none;margin-top:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:600;color:var(--text2)">대기 사진 <span id="queue-count" style="color:var(--primary)">0</span>장</span>
+                <button class="btn btn-ghost btn-sm" onclick="clearAllQueue()">전체 취소</button>
+              </div>
+              <div id="capture-thumbnails" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+              <button class="btn btn-primary btn-full" id="start-analyze-btn" onclick="startAnalyzeQueue()">
+                🔍 AI 분석 시작
+              </button>
+            </div>
+
+            <!-- 단일 사진 미리보기 (분석 중) -->
             <div id="preview-area" style="display:none;margin-top:10px">
               <img id="preview-img" class="preview-img" alt="미리보기">
-              <button class="btn btn-ghost btn-sm" onclick="clearPreview()">✕ 사진 제거</button>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-ghost btn-sm" onclick="clearPreview()">✕ 사진 제거</button>
+              </div>
             </div>
+
+            <!-- 큐 진행 배너 -->
+            <div id="queue-banner" style="display:none;background:var(--primary-light);color:var(--primary);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;margin-top:10px"></div>
           </div>
 
           <div class="card" id="result-card" style="display:none">
