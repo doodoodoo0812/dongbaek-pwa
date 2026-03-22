@@ -35,14 +35,17 @@ html, body {
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
-  overflow: hidden;
+  /* 모바일 사파리 스크롤 허용 */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: -webkit-fill-available;
+  /* 사파리에서 100vh 버그 대응 */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   background: var(--surface);
 }
 
@@ -105,9 +108,11 @@ html, body {
   display: none;
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
-  padding-bottom: 32px;
+  padding-bottom: 40px;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .panel.active { display: block; }
 
@@ -545,6 +550,8 @@ html, body {
       "header header"
       "sidenav main";
     background: var(--bg);
+    height: 100vh;
+    min-height: unset;
   }
 
   .header {
@@ -575,9 +582,9 @@ html, body {
   .tab-btn {
     flex-direction: row;
     justify-content: flex-start;
-    padding: 11px 14px;
+    padding: 8px 12px;
     border-radius: var(--radius-sm);
-    gap: 12px;
+    gap: 10px;
     height: auto;
     color: var(--text2);
   }
@@ -587,8 +594,8 @@ html, body {
     color: var(--primary);
   }
   .tab-btn.active::after { display: none; }
-  .tab-icon { font-size: 20px; }
-  .tab-label { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .tab-icon { font-size: 18px; }
+  .tab-label { font-size: 15px; font-weight: 600; white-space: nowrap; }
 
   /* 메인 영역 */
   .main {

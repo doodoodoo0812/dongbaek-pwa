@@ -1,34 +1,52 @@
-// 동백전 납부 매칭 - Service Worker
-// 버전 바꾸면 자동으로 새 캐시 적용됨
-const CACHE_NAME = 'dongbaek-v' + Date.now();
+// 동백전 납부 매칭 - Service Worker v3
+const CACHE_NAME = 'dongbaek-v3';
+const BASE = '/dongbaek-pwa';
+const ASSETS = [
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/style.css',
+  BASE + '/app.js',
+  BASE + '/manifest.json',
+  BASE + '/icons/icon-192.png',
+  BASE + '/icons/icon-512.png',
+];
 
-// 네트워크 우선 전략 — 항상 최신 파일 사용
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', e => {
-  // 이전 버전 캐시 모두 삭제
+// 설치 시 핵심 파일 캐시
+self.addEventListener('install', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('fetch', e => {
-  // API 요청은 캐시 안 함
-  if (e.request.url.includes('googleapis.com') ||
-      e.request.url.includes('firebasejs') ||
-      e.request.url.includes('gstatic.com')) return;
+// 구버전 캐시 삭제
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
 
-  // 네트워크 우선, 실패하면 캐시
+// 네트워크 우선, 실패 시 캐시
+self.addEventListener('fetch', e => {
+  // 외부 API는 캐시 안 함
+  if (e.request.url.includes('googleapis.com') ||
+      e.request.url.includes('gstatic.com') ||
+      e.request.url.includes('firebasejs') ||
+      e.request.url.includes('jsdelivr.net') ||
+      e.request.url.includes('fonts.googleapis')) return;
+
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        // 성공하면 캐시에 저장
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+        }
         return res;
       })
       .catch(() => caches.match(e.request))
