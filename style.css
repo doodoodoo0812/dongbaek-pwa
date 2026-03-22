@@ -43,10 +43,7 @@ html, body {
   flex-direction: column;
   height: 100vh;
   height: -webkit-fill-available;
-  max-width: 600px;
-  margin: 0 auto;
   background: var(--surface);
-  box-shadow: 0 0 40px rgba(0,0,0,0.1);
 }
 
 /* ===== Header ===== */
@@ -513,16 +510,8 @@ html, body {
 .teacher-student-item:last-child { margin-bottom: 0; }
 .teacher-student-name { font-size: 14px; font-weight: 500; }
 .teacher-student-info { font-size: 12px; color: var(--text2); margin-top: 2px; }
-@media (min-width: 601px) {
-  #app {
-    position: fixed;
-    top: 0; bottom: 0; left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 600px;
-  }
-  html, body { background: #e8e4df; overflow: auto; }
-}
+/* 601px 규칙 → 768px 반응형으로 통합 */
+
 
 /* ===== 스크롤바 ===== */
 ::-webkit-scrollbar { width: 4px; }
@@ -530,337 +519,123 @@ html, body {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 /* ===================================================
-   반응형 레이아웃 — PC / 태블릿 / 모바일
+   반응형 레이아웃
+   모바일(~767px): 하단 탭바, 전체화면
+   PC/태블릿(768px~): 좌측 사이드바, 전체화면 그리드
    =================================================== */
 
-/* 태블릿 (768px 이상) */
+/* 모바일 기본 — 전체화면, 추가 설정 없음 (기본 #app 스타일에서 처리) */
+
+/* ── PC / 태블릿 (768px 이상) ── */
 @media (min-width: 768px) {
   :root {
     --header-h: 60px;
-    --nav-h: 0px; /* 사이드 탭으로 대체 */
   }
 
-  html, body { overflow: auto; background: #ddd8d2; }
+  html, body {
+    overflow: hidden;
+    background: var(--bg);
+  }
 
   #app {
-    position: fixed;
-    inset: 0;
-    max-width: none;
     display: grid;
     grid-template-rows: var(--header-h) 1fr;
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 210px 1fr;
     grid-template-areas:
       "header header"
       "sidenav main";
-    box-shadow: none;
-    background: #ddd8d2;
+    background: var(--bg);
   }
 
-  /* 헤더 전체 너비 */
   .header {
     grid-area: header;
-    border-bottom: 1px solid var(--border);
     background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
-  .header-inner { max-width: none; padding: 0 24px; }
+  .header-inner {
+    max-width: none;
+    padding: 0 28px;
+  }
   .logo-text { font-size: 18px; }
 
-  /* 탭 → 사이드 네비게이션 */
+  /* 하단 탭 → 좌측 사이드바 */
   .tab-nav {
     grid-area: sidenav;
     flex-direction: column;
+    width: 210px;
     height: auto;
-    width: 200px;
     border-right: 1px solid var(--border);
     border-bottom: none;
     background: var(--surface);
     padding: 16px 12px;
     gap: 4px;
     overflow-y: auto;
+    flex-shrink: 0;
   }
-
   .tab-btn {
     flex-direction: row;
     justify-content: flex-start;
-    padding: 12px 16px;
+    padding: 11px 14px;
     border-radius: var(--radius-sm);
     gap: 12px;
-    color: var(--text2);
-    font-size: 14px;
     height: auto;
+    color: var(--text2);
   }
+  .tab-btn:hover { background: var(--surface2); }
   .tab-btn.active {
     background: var(--primary-light);
     color: var(--primary);
   }
   .tab-btn.active::after { display: none; }
   .tab-icon { font-size: 20px; }
-  .tab-label { font-size: 13px; font-weight: 600; }
-
-  /* 메인 컨텐츠 */
-  .main {
-    grid-area: main;
-    overflow: hidden;
-    background: var(--bg);
-  }
-
-  .panel {
-    padding: 24px 28px;
-    padding-bottom: 40px;
-    height: 100%;
-    overflow-y: auto;
-    max-width: 900px;
-  }
-
-  /* PC에서 폼 3열 */
-  .form-grid {
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-  }
-
-  /* PC에서 카드 간격 */
-  .card { padding: 20px 24px; margin-bottom: 16px; }
-  .card-title { font-size: 13px; }
-
-  /* 통계 카드 더 크게 */
-  .stat-value { font-size: 28px; }
-  .stat-label { font-size: 12px; }
-
-  /* 납부 현황 행 더 넓게 */
-  .status-row {
-    grid-template-columns: 1fr 100px 120px 100px;
-    padding: 10px 18px;
-    font-size: 14px;
-  }
-  .status-col-header {
-    grid-template-columns: 1fr 100px 120px 100px;
-    padding: 8px 18px;
-    font-size: 12px;
-  }
-
-  /* 버튼 */
-  .btn { height: 42px; font-size: 14px; }
-  .btn-sm { height: 34px; font-size: 13px; }
-
-  /* 업로드 존 더 크게 */
-  .upload-zone { padding: 48px 24px; }
-  .upload-icon { font-size: 52px; }
-  .upload-text { font-size: 16px; }
-
-  /* 미리보기 이미지 */
-  .preview-img { max-height: 360px; }
-
-  /* 모달 가운데 정렬 */
-  .modal-overlay { align-items: center; }
-  .modal {
-    border-radius: var(--radius);
-    max-width: 640px;
-    max-height: 90vh;
-  }
-
-  /* 입력 모드 버튼 */
-  .input-mode-btn { padding: 12px 16px; font-size: 14px; }
-
-  /* 회원 상단바 */
-  .member-topbar-title { font-size: 20px; }
-}
-
-/* PC 대형 (1200px 이상) */
-@media (min-width: 1200px) {
-  #app {
-    grid-template-columns: 220px 1fr;
-  }
-
-  .tab-nav { width: 220px; padding: 20px 14px; }
-
-  .panel {
-    padding: 28px 40px;
-    max-width: 1100px;
-  }
-
-  /* 큰 화면에서 2컬럼 레이아웃 */
-  .panel-two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    align-items: start;
-  }
-
-  .form-grid { grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-
-  .stats-grid { gap: 12px; }
-  .stat-value { font-size: 32px; }
-
-  .status-row {
-    grid-template-columns: 1fr 120px 140px 120px;
-    padding: 11px 20px;
-  }
-  .status-col-header {
-    grid-template-columns: 1fr 120px 140px 120px;
-    padding: 9px 20px;
-  }
-}
-
-/* =============================================
-   PC 반응형 레이아웃 (768px 이상)
-   ============================================= */
-@media (min-width: 768px) {
-
-  html, body { overflow: auto; }
-
-  #app {
-    max-width: 100%;
-    height: 100vh;
-    display: grid;
-    grid-template-rows: var(--header-h) 1fr;
-    grid-template-columns: 220px 1fr;
-    grid-template-areas:
-      "header header"
-      "sidebar main";
-    box-shadow: none;
-  }
-
-  /* 헤더 전체 폭 */
-  .header {
-    grid-area: header;
-    border-bottom: 1px solid var(--border);
-  }
-  .header-inner { max-width: 100%; padding: 0 24px; }
-  .logo-text { font-size: 18px; }
-
-  /* 탭 → 사이드바로 변환 */
-  .tab-nav {
-    grid-area: sidebar;
-    flex-direction: column;
-    height: 100%;
-    border-bottom: none;
-    border-right: 1px solid var(--border);
-    padding: 16px 12px;
-    gap: 4px;
-    background: var(--surface);
-    overflow-y: auto;
-  }
-  .tab-btn {
-    flex: none;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: var(--radius-sm);
-    width: 100%;
-    text-align: left;
-  }
-  .tab-btn.active { background: var(--primary-light); color: var(--primary); }
-  .tab-btn.active::after { display: none; }
-  .tab-icon { font-size: 18px; }
-  .tab-label { font-size: 13px; font-weight: 600; }
+  .tab-label { font-size: 13px; font-weight: 600; white-space: nowrap; }
 
   /* 메인 영역 */
   .main {
     grid-area: main;
     overflow: hidden;
-    background: var(--bg);
+    position: relative;
   }
 
-  /* 패널 */
   .panel {
-    padding: 24px;
-    padding-bottom: 40px;
-    max-width: 100%;
+    padding: 24px 32px 48px;
+    max-width: 860px;
   }
 
-  /* 회원탭: 2컬럼 그리드 */
-  #panel-members {
-    display: none;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 0 20px;
-    height: 100%;
-    overflow-y: auto;
-  }
-  #panel-members.active { display: grid; }
-
-  .member-topbar {
-    grid-column: 1 / -1;
-    margin-bottom: 16px;
-  }
-  #member-search-bar { grid-column: 1 / -1; }
-  #member-search-results { grid-column: 1 / -1; }
-  #member-add-form { grid-column: 1; }
-  #panel-members > .card:last-child { grid-column: 2; grid-row: 2; }
-
-  /* 결제탭: 좌(등록) 우(목록) */
-  #panel-payments {
-    display: none;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 0 20px;
-    height: 100%;
-    overflow-y: auto;
-    align-items: start;
-  }
-  #panel-payments.active { display: grid; }
-
-  #panel-payments .panel-header { grid-column: 1 / -1; margin-bottom: 16px; }
-  .input-mode-bar { grid-column: 1; }
-  #input-manual { grid-column: 1; }
-  #input-capture { grid-column: 1; }
-  #input-bulk { grid-column: 1; }
-  #panel-payments > .card:last-child {
-    grid-column: 2;
-    grid-row: 2 / 10;
-    position: sticky;
-    top: 0;
-  }
-
-  /* 현황탭: 통계 상단, 목록 하단 넓게 */
-  #panel-status {
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  .stats-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .card { padding: 20px 24px; }
+  .form-grid { grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
   .stat-value { font-size: 28px; }
 
-  /* 현황 리스트 - PC에서 더 넓게 */
   .status-row {
-    grid-template-columns: 1.5fr 100px 120px 120px;
+    grid-template-columns: 1fr 100px 120px 110px;
+    padding: 10px 18px;
+    font-size: 14px;
   }
   .status-col-header {
-    grid-template-columns: 1.5fr 100px 120px 120px;
+    grid-template-columns: 1fr 100px 120px 110px;
+    padding: 8px 18px;
+    font-size: 12px;
   }
 
-  /* 폼 그리드 PC에서 3컬럼 */
-  .form-grid { grid-template-columns: 1fr 1fr 1fr; }
-
-  /* 업로드 존 PC에서 더 크게 */
   .upload-zone { padding: 48px 24px; }
   .upload-icon { font-size: 52px; }
-  .upload-text { font-size: 17px; }
-
-  /* 모달 PC에서 중앙 정렬 */
+  .preview-img { max-height: 360px; }
   .modal-overlay { align-items: center; }
-  .modal { max-height: 85vh; border-radius: var(--radius); }
-
-  /* 카드 그림자 강화 */
-  .card { box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
-
-  /* 선생님 그룹 테이블 PC에서 더 여유있게 */
-  .status-teacher-header { padding: 12px 18px; }
-  .status-row { padding: 10px 18px; }
-  .status-col-header { padding: 8px 18px; }
+  .modal { border-radius: var(--radius); max-width: 640px; }
+  .input-mode-btn { padding: 12px 16px; font-size: 14px; }
+  .member-topbar-title { font-size: 20px; }
+  .btn { height: 42px; }
+  .btn-sm { height: 34px; font-size: 13px; }
 }
 
-/* 태블릿 중간 사이즈 */
-@media (min-width: 768px) and (max-width: 1100px) {
-  #app { grid-template-columns: 180px 1fr; }
-  .tab-label { font-size: 12px; }
-}
-
-/* 넓은 PC */
-@media (min-width: 1400px) {
-  #app { grid-template-columns: 240px 1fr; }
-  .panel { padding: 28px 32px; }
-  #panel-members { grid-template-columns: 1fr 1fr; gap: 0 28px; }
-  #panel-payments { grid-template-columns: 480px 1fr; gap: 0 28px; }
+/* ── 대형 PC (1200px 이상) ── */
+@media (min-width: 1200px) {
+  #app {
+    grid-template-columns: 230px 1fr;
+  }
+  .tab-nav { width: 230px; padding: 20px 14px; }
+  .panel { padding: 28px 48px 56px; max-width: 1000px; }
+  .stat-value { font-size: 32px; }
+  .status-row { grid-template-columns: 1fr 120px 140px 120px; padding: 11px 22px; }
+  .status-col-header { grid-template-columns: 1fr 120px 140px 120px; padding: 9px 22px; }
 }

@@ -21,6 +21,7 @@
         <div class="logo">
           <span class="logo-icon">🌸</span>
           <span class="logo-text">동백전 납부 매칭</span>
+          <span id="sync-indicator" style="display:none;font-size:11px;color:var(--text3);margin-left:6px">☁️ 연결 중...</span>
         </div>
         <button class="settings-btn" onclick="openSettings()" title="설정">⚙️</button>
       </div>
@@ -483,6 +484,56 @@
   </div>
 
   <div id="toast" class="toast"></div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATf7_PlOg_VPZi-De0XFYflfWRRP4RPo4",
+      authDomain: "dongbaek-pwa.firebaseapp.com",
+      projectId: "dongbaek-pwa",
+      storageBucket: "dongbaek-pwa.firebasestorage.app",
+      messagingSenderId: "729339392448",
+      appId: "1:729339392448:web:c53a8aac9418d909c21825"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const firestoreDb = getFirestore(firebaseApp);
+    const DATA_DOC = doc(firestoreDb, 'dongbaek', 'main');
+
+    // Firebase → 앱 전역으로 노출
+    window._firebase = {
+      // 저장
+      async save(data) {
+        try {
+          await setDoc(DATA_DOC, {
+            members: data.members,
+            payments: data.payments,
+            settings: data.settings,
+            updatedAt: new Date().toISOString()
+          });
+        } catch (e) {
+          console.warn('Firebase 저장 실패 (오프라인?):', e.message);
+        }
+      },
+      // 실시간 동기화 시작
+      startSync(onUpdate) {
+        return onSnapshot(DATA_DOC, (snap) => {
+          if (snap.exists()) {
+            onUpdate(snap.data());
+          }
+        }, (err) => {
+          console.warn('Firebase 동기화 오류:', err.message);
+        });
+      }
+    };
+
+    // Firebase 준비 완료 이벤트 발생
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
   <script src="app.js"></script>
 </body>
 </html>

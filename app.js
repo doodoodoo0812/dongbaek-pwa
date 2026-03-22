@@ -40,10 +40,32 @@ function init() {
 
   // 초기 미납 뱃지
   updateUnpaidBadge();
+
+  // Firebase 준비 완료 시 실시간 동기화 시작
+  window.addEventListener('firebase-ready', () => {
+    firebaseReady = true;
+    const indicator = document.getElementById('sync-indicator');
+    if (indicator) {
+      indicator.textContent = '☁️ 연결됨';
+      indicator.style.display = 'inline';
+    }
+    // 실시간 동기화 리스너 등록
+    window._firebase.startSync((data) => {
+      applyFirebaseData(data);
+    });
+  });
 }
+
+// ===== Firebase 상태 =====
+let firebaseReady = false;
+let isSyncing = false; // Firebase에서 받아온 데이터로 업데이트 중일 때 재저장 방지
 
 function saveData() {
   localStorage.setItem('dongbaek_db', JSON.stringify(db));
+  // Firebase에도 저장 (준비됐을 때만)
+  if (firebaseReady && !isSyncing && window._firebase) {
+    window._firebase.save(db);
+  }
 }
 
 function loadData() {
@@ -51,6 +73,48 @@ function loadData() {
   if (saved) {
     try { db = { ...db, ...JSON.parse(saved) }; } catch (e) {}
   }
+}
+
+// Firebase 실시간 동기화 처리
+function applyFirebaseData(data) {
+  if (!data) return;
+  isSyncing = true;
+
+  const localUpdatedAt = db._updatedAt || '';
+  const remoteUpdatedAt = data.updatedAt || '';
+
+  // 원격 데이터가 더 최신이면 덮어쓰기
+  if (remoteUpdatedAt > localUpdatedAt) {
+    db.members = data.members || db.members;
+    db.payments = data.payments || db.payments;
+    // settings.apiKey는 로컬 우선 (보안)
+    if (data.settings && data.settings.apiKey) {
+      db.settings.apiKey = db.settings.apiKey || data.settings.apiKey;
+    }
+    db._updatedAt = remoteUpdatedAt;
+    localStorage.setItem('dongbaek_db', JSON.stringify(db));
+
+    // UI 갱신
+    renderMembers();
+    renderPayments();
+    if (currentTab === 'status') renderStatus();
+    updateUnpaidBadge();
+    showSyncIndicator();
+  }
+
+  isSyncing = false;
+}
+
+function showSyncIndicator() {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.textContent = '☁️ 동기화됨';
+  el.style.color = 'var(--paid)';
+  clearTimeout(window._syncTimer);
+  window._syncTimer = setTimeout(() => {
+    el.textContent = '☁️ 연결됨';
+    el.style.color = 'var(--text3)';
+  }, 2000);
 }
 
 // ===== 탭 전환 =====
