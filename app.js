@@ -969,11 +969,67 @@ function handleDragLeave() { document.getElementById('upload-zone').classList.re
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('upload-zone').classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) loadImageFile(file);
-  else showToast('이미지 파일만 올려주세요');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if (!files.length) { showToast('이미지 파일만 올려주세요'); return; }
+  if (files.length === 1) {
+    loadImageFile(files[0]);
+  } else {
+    // 여러 장 → 일괄 캡처 큐로 처리
+    loadImageQueue(files);
+  }
 }
-function handleFileSelect(e) { if (e.target.files[0]) loadImageFile(e.target.files[0]); }
+function handleFileSelect(e) {
+  const files = [...e.target.files].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  if (files.length === 1) {
+    loadImageFile(files[0]);
+  } else {
+    loadImageQueue(files);
+  }
+  e.target.value = '';
+}
+
+// ===== 여러 장 순차 처리 큐 =====
+let imageQueue = [];
+let isProcessingQueue = false;
+
+async function loadImageQueue(files) {
+  // 일괄 탭으로 자동 전환 안 하고, 캡처 탭에서 큐로 순서대로 처리
+  showToast(`${files.length}장을 순서대로 처리할게요`);
+  imageQueue = [...files];
+  if (!isProcessingQueue) processNextInQueue();
+}
+
+async function processNextInQueue() {
+  if (imageQueue.length === 0) {
+    isProcessingQueue = false;
+    showToast('모든 사진 처리 완료!');
+    return;
+  }
+  isProcessingQueue = true;
+  const file = imageQueue.shift();
+  const remaining = imageQueue.length;
+
+  // 큐 진행 상태 표시
+  const queueBanner = document.getElementById('queue-banner');
+  if (queueBanner) {
+    queueBanner.style.display = remaining > 0 ? 'block' : 'none';
+    queueBanner.textContent = `📋 처리 중... 남은 사진: ${remaining}장 (저장 후 자동으로 다음 사진으로 넘어가요)`;
+  }
+
+  loadImageFile(file);
+}
+
+// 캡처 저장 후 다음 큐 자동 처리
+function afterCaptureSaved() {
+  if (imageQueue.length > 0) {
+    setTimeout(() => processNextInQueue(), 400);
+  } else {
+    isProcessingQueue = false;
+    const queueBanner = document.getElementById('queue-banner');
+    if (queueBanner) queueBanner.style.display = 'none';
+  }
+}
 function handlePaste(e) {
   if (currentTab !== 'payments') return;
 
@@ -1248,7 +1304,13 @@ function doSaveCapture(date, time, payer, amount, memberName, teacher) {
   }
 
   db.payments.push({ id: Date.now(), datetime, date, time, payer, amount, memberId, createdAt: new Date().toISOString() });
-  saveData(); clearPreview(); switchTab('payments');
+  saveData(); clearPreview();
+  // 큐에 남은 사진 있으면 자동으로 다음 처리, 없으면 결제 탭 유지
+  if (imageQueue.length > 0) {
+    afterCaptureSaved();
+  } else {
+    switchTab('payments');
+  }
   showToast(memberId ? `내역 저장 및 ${db.members.find(m=>m.id===memberId)?.name} 매칭 완료!` : '내역에 저장됐어요!');
 }
 
@@ -1337,6 +1399,88 @@ function showConfirm(title, message, detail, onOk, infoOnly = false) {
 function closeConfirmModal() { document.getElementById('confirm-modal').style.display = 'none'; }
 
 // ===== 데이터 백업/복원 =====
+// ===== 전체 데이터 엑셀 백업 (시트 3개) =====
+function exportAllDataExcel() {
+  if (!window.XLSX) { showToast('잠시 후 다시 시도해주세요'); return; }
+  if (db.members.length === 0) { showToast('등록된 회원이 없어요'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // ── 시트1: 회원 명단 ──
+  const memberRows = [['번호','회원(학생)이름','마스킹패턴','담당선생님','월납부액','메모','등록일']];
+  db.members.forEach((m, i) => {
+    memberRows.push([
+      i + 1, m.name, m.mask || '', m.teacher || '',
+      m.fee || '', m.memo || '',
+      m.createdAt ? m.createdAt.slice(0, 10) : ''
+    ]);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(memberRows);
+  ws1['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws1, '회원명단');
+
+  // ── 시트2: 전체 결제 내역 ──
+  const payRows = [['번호','결제일시','결제날짜','결제시간','결제자(마스킹)','금액','매칭회원','담당선생님']];
+  const sortedPay = [...db.payments].sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
+  sortedPay.forEach((p, i) => {
+    const member = p.memberId ? db.members.find(m => m.id === p.memberId) : null;
+    payRows.push([
+      i + 1, p.datetime || '', p.date || '', p.time || '',
+      p.payer || '', p.amount || '',
+      member ? member.name : '미매칭',
+      member ? (member.teacher || '') : ''
+    ]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(payRows);
+  ws2['!cols'] = [{ wch: 5 }, { wch: 18 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws2, '전체결제내역');
+
+  // ── 시트3: 월별 납부 요약 ──
+  // 결제 내역에서 존재하는 월 목록 추출 (최근 12개월 기준)
+  const now = new Date();
+  const allMonths = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    allMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  // 실제 데이터 있는 월만 포함
+  const usedMonths = allMonths.filter(ym =>
+    db.payments.some(p => p.date && p.date.startsWith(ym))
+  );
+  const months = usedMonths.length > 0 ? usedMonths : allMonths.slice(-3);
+
+  const summaryHeader = ['회원이름', '담당선생님', ...months, '납부횟수'];
+  const summaryRows = [summaryHeader];
+
+  const sortedMembers = [...db.members].sort((a, b) => {
+    const ai = TEACHER_ORDER.indexOf(a.teacher || ''), bi = TEACHER_ORDER.indexOf(b.teacher || '');
+    if (ai === -1 && bi === -1) return (a.teacher || '').localeCompare(b.teacher || '');
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  sortedMembers.forEach(m => {
+    const cells = [m.name, m.teacher || ''];
+    let paidCount = 0;
+    months.forEach(ym => {
+      const paid = db.payments.some(p => p.memberId === m.id && p.date && p.date.startsWith(ym));
+      cells.push(paid ? '✅' : '');
+      if (paid) paidCount++;
+    });
+    cells.push(`${paidCount}/${months.length}`);
+    summaryRows.push(cells);
+  });
+
+  const ws3 = XLSX.utils.aoa_to_sheet(summaryRows);
+  ws3['!cols'] = [{ wch: 12 }, { wch: 12 }, ...months.map(() => ({ wch: 10 })), { wch: 8 }];
+  XLSX.utils.book_append_sheet(wb, ws3, '월별납부요약');
+
+  XLSX.writeFile(wb, `동백전_전체백업_${today}.xlsx`);
+  showToast('전체 엑셀 백업이 다운로드됐어요');
+}
+
+// ===== 전체 데이터 JSON 백업 =====
 function exportAllData() {
   const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
