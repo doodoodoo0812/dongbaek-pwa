@@ -685,34 +685,77 @@ function renderPayments() {
     return;
   }
 
+  // 날짜 역순 정렬
   const sorted = [...filtered].sort((a, b) => (b.datetime || '').localeCompare(a.datetime || ''));
 
-  list.innerHTML = sorted.map(p => {
+  // 선생님별 그룹핑
+  const groups = {};
+  const teacherOrder = getTeacherOrder();
+
+  sorted.forEach(p => {
     const member = p.memberId ? db.members.find(m => m.id === p.memberId) : null;
-    const candidates = getCandidates(p.payer);
-    const matchHtml = member
-      ? `<span style="color:var(--paid);font-size:12px;font-weight:500">✅ ${member.name}${member.teacher ? ' · ' + member.teacher : ''}</span>`
-      : candidates.length === 1
-        ? `<span style="color:var(--unknown);font-size:12px;cursor:pointer" onclick="confirmAssign(${p.id},${candidates[0].id})">🔗 ${candidates[0].name}? (클릭매칭)</span>`
-        : candidates.length > 1
-          ? `<span style="color:var(--unknown);font-size:12px;cursor:pointer" onclick="openMatchModal(${p.id})">⚠️ 후보 ${candidates.length}명 (클릭선택)</span>`
-          : `<span style="color:var(--text3);font-size:12px">미매칭</span>`;
+    const teacher = member?.teacher || '(미매칭)';
+    if (!groups[teacher]) groups[teacher] = [];
+    groups[teacher].push({ p, member });
+  });
+
+  // 선생님 순서 정렬 (미매칭은 맨 뒤)
+  const teacherNames = Object.keys(groups).sort((a, b) => {
+    if (a === '(미매칭)') return 1;
+    if (b === '(미매칭)') return -1;
+    const ai = teacherOrder.indexOf(a), bi = teacherOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  list.innerHTML = teacherNames.map(teacher => {
+    const items = groups[teacher];
+    const safeId = 'pg-' + teacher.replace(/[\s()]/g, '-');
+
+    const rows = items.map(({ p, member }) => {
+      const candidates = getCandidates(p.payer);
+      const matchHtml = member
+        ? `<span style="color:var(--paid);font-size:12px;font-weight:500">✅ ${member.name}</span>`
+        : candidates.length === 1
+          ? `<span style="color:var(--unknown);font-size:12px;cursor:pointer" onclick="confirmAssign(${p.id},${candidates[0].id})">🔗 ${candidates[0].name}? (클릭매칭)</span>`
+          : candidates.length > 1
+            ? `<span style="color:var(--unknown);font-size:12px;cursor:pointer" onclick="openMatchModal(${p.id})">⚠️ 후보 ${candidates.length}명</span>`
+            : `<span style="color:var(--text3);font-size:12px">미매칭</span>`;
+
+      return `
+        <div class="payment-item" id="pitem-${p.id}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--primary)">${p.payer || '(이름없음)'}</span>
+                <span style="font-size:15px;font-weight:700">${p.amount ? p.amount.toLocaleString() + '원' : '-'}</span>
+              </div>
+              <div style="font-size:12px;color:var(--text3);margin-bottom:4px">${p.datetime || '-'}</div>
+              <div>${matchHtml}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+              <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="openEditPayment(${p.id})">✏️ 수정</button>
+              <button class="btn btn-danger btn-sm" style="font-size:11px" onclick="deletePayment(${p.id})">삭제</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
 
     return `
-      <div class="payment-item" id="pitem-${p.id}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-              <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--primary)">${p.payer || '(이름없음)'}</span>
-              <span style="font-size:15px;font-weight:700">${p.amount ? p.amount.toLocaleString() + '원' : '-'}</span>
-            </div>
-            <div style="font-size:12px;color:var(--text3);margin-bottom:4px">${p.datetime || '-'}</div>
-            <div>${matchHtml}</div>
+      <div class="teacher-group open" id="${safeId}" style="margin-bottom:10px">
+        <div class="teacher-group-header" onclick="toggleTeacherGroup('${safeId}')">
+          <div class="teacher-group-title">
+            <span>👨‍🏫</span>
+            <span>${teacher}</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-            <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="openEditPayment(${p.id})">✏️ 수정</button>
-            <button class="btn btn-danger btn-sm" style="font-size:11px" onclick="deletePayment(${p.id})">삭제</button>
+          <div class="teacher-group-meta">
+            <span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:12px;font-weight:700">${items.length}건</span>
+            <span class="teacher-group-arrow">▼</span>
           </div>
+        </div>
+        <div class="teacher-group-body" style="padding:8px">
+          ${rows}
         </div>
       </div>`;
   }).join('');
